@@ -12,13 +12,13 @@ if $MAKE_VENV; then
     export PYTHONPATH=/usr/bin/python3 # point to your python3
     python3 -m pip install virtualenv
     cd $DIR
-    virtualenv -p python3 social_vdgnn
+    virtualenv -p python3 social_vrnn
 fi
 
 if $SOURCE_VENV; then
     cd $DIR
-    source social_vdgnn/bin/activate
-    export PYTHONPATH=${DIR}/social_vdgnn/bin/python/dist-packages
+    source social_vrnn/bin/activate
+    export PYTHONPATH=${DIR}/social_vrnn/bin/python/dist-packages
 fi
 
 # Install this pkg and its requirements
