@@ -1103,8 +1103,8 @@ class Recorder():
 
 					# Adding legend
 					font = cv2.FONT_HERSHEY_SIMPLEX
-					cv2.line(image_new, (frame_width - 300, 30), (frame_width - 280, 30), (0, 0, 0), 4)
-					cv2.putText(image_new, "Real Trajectory", (frame_width - 270, 30), font, 0.5, (0, 0, 0), 2, cv2.LINE_AA)
+					cv2.line(image_new, (frame_width - 300, 30), (frame_width - 280, 30), (255, 0, 0), 4)
+					cv2.putText(image_new, "Real Trajectory", (frame_width - 270, 30), font, 0.5, (255, 0, 0), 2, cv2.LINE_AA)
 					cv2.line(image_new, (frame_width - 300, 50), (frame_width - 280, 50), (0, 0, 255), 4)
 					if self.args.output_pred_state_dim == 5:
 						cv2.putText(image_new, "Predicted Trajectory Prob " + str(np.sum(pis[:,0])/self.args.prediction_horizon*100), (frame_width - 270, 50), font, 0.5, (0, 0, 255), 2,
