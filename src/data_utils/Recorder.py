@@ -1117,13 +1117,13 @@ class Recorder():
 						            cv2.LINE_AA)
 						cv2.line(image_new, (frame_width - 300, 110), (frame_width - 280, 110), (255, 153, 51), 4)
 					else:
-						cv2.putText(image_new, "Predicted Trajectory w. prob.: " + str(np.around(traj_likelihood[step][0,0,0],decimals=2)), (frame_width - 270, 50), font, 0.5, (0, 0, 255), 2,
+						cv2.putText(image_new, "Predicted Trajectory 1", (frame_width - 270, 50), font, 0.5, (0, 0, 255), 2,
 						            cv2.LINE_AA)
 						cv2.line(image_new, (frame_width - 300, 70), (frame_width - 280, 70), (0, 255, 0), 4)
-						cv2.putText(image_new, "Predicted Trajectory w. prob.: " + str(np.around(traj_likelihood[step][0,0,1],decimals=2)), (frame_width - 270, 70), font, 0.5, (0, 255, 0), 2,
+						cv2.putText(image_new, "Predicted Trajectory 2", (frame_width - 270, 70), font, 0.5, (0, 255, 0), 2,
 						            cv2.LINE_AA)
 						cv2.line(image_new, (frame_width - 300, 90), (frame_width - 280, 90), (0, 255, 255), 4)
-						cv2.putText(image_new, "Predicted Trajectory w. prob.: " + str(np.around(traj_likelihood[step][0,0,2],decimals=2)), (frame_width - 270, 90), font, 0.5, (0, 255, 255), 2,
+						cv2.putText(image_new, "Predicted Trajectory 3" , (frame_width - 270, 90), font, 0.5, (0, 255, 255), 2,
 						            cv2.LINE_AA)
 						cv2.line(image_new, (frame_width - 300, 110), (frame_width - 280, 110), (255, 153, 51), 4)
 					cv2.putText(image_new, "1-sigma Uncertainty", (frame_width - 270, 110), font, 0.5, (255,153,51), 2,
