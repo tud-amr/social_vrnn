@@ -1,0 +1,11 @@
+tensorflow==1.15.0
+tensorflow_probability==0.7.0
+colorama
+matplotlib==2.1.2
+progressbar
+opencv-python
+pykalman
+scipy
+torch==1.2.0
+torchvision==0.4.0
+tqdm
