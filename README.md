@@ -17,7 +17,7 @@ This set of instructions were only tested for Ubuntu16 with Tensorflow 1.15.
 ```
 ./install.sh
 ./download_data
-source social_vdgnn/bin/activate
+source social_vrnn/bin/activate
 ```
 * To test the models:
 ```
@@ -28,6 +28,11 @@ cd src/
 ```
 cd src/
 ./train.sh
+```
+* To run comparison with Social-ways model:
+```
+cd src/
+./test_socialways.sh
 ```
 The train.sh script has several examples how to train the proposed model for different datasets and considering different hyperparameters. After the model is trained, the test.sh script evaluates the quatitative and qualitative performance of the trained models. Each model has a name and an id (`--exp_num`) which identifies it.
 To evaluate the trained models, adapt accordingly the id's and model name on the `test.sh` script. For a qualitative analysis set `--record true`. For a quantitative analysis set `--record false`.

@@ -1,4 +1,4 @@
-wget -O data.zip 'https://surfdrive.surf.nl/files/index.php/s/W6QHpgcvdZTcQ15/download'
+wget -O data.zip 'https://surfdrive.surf.nl/files/index.php/s/Isu6dbIUBIHAvA5/download'
 unzip -q data.zip
 rm -rf data.zip
 

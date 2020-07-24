@@ -1066,8 +1066,8 @@ class Recorder():
 
 									if self.args.output_pred_state_dim > 2:
 										# prior of 0 on the uncertainty of the pedestrian velocity
-										sigma_x = np.square(min(max(sigmax[0],1.0),5.0)) * self.args.dt * self.args.dt +0.3
-										sigma_y = np.square(min(max(sigmay[0],1.0),5.0))  * self.args.dt * self.args.dt +0.3
+										sigma_x = np.square(min(max(sigmax[0],0.5),2.0)) * self.args.dt * self.args.dt +0.3
+										sigma_y = np.square(min(max(sigmay[0],0.5),2.0))  * self.args.dt * self.args.dt +0.3
 										if math.isnan(sigma_x) | math.isnan(sigma_y):
 											continue
 										axis = (int(np.sqrt(sigma_x) /resolution),int(np.sqrt(sigma_y) /resolution))
@@ -1075,8 +1075,8 @@ class Recorder():
 										cv2.ellipse(overlay_ellipses, center,       axis,    0, 0, 360, (255,153,51),-1)
 
 										for pred_step in range(1, self.args.prediction_horizon):
-											sigma_x = sigma_x + np.square(min(max(sigmax[pred_step],1.0),5.0)) * self.args.dt * self.args.dt
-											sigma_y = sigma_y + np.square(min(max(sigmay[pred_step],1.0),5.0)) * self.args.dt * self.args.dt
+											sigma_x = sigma_x + np.square(min(max(sigmax[pred_step],0.5),2.0)) * self.args.dt * self.args.dt
+											sigma_y = sigma_y + np.square(min(max(sigmay[pred_step],0.5),2.0)) * self.args.dt * self.args.dt
 											if math.isnan(sigma_x) | math.isnan(sigma_y):
 												continue
 											axis = (int(np.sqrt(sigma_x) / resolution),

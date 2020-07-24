@@ -1,3 +1,7 @@
 **data
 trained_models
 social_vrnn
+*pyc
+dist
+social_vrnn.egg-info
+*.csv
