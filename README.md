@@ -1,12 +1,12 @@
 # Social-VRNN: One-Shot Multi-modal Trajectory Prediction for Interacting Pedestrians
 
-<img src="docs/imgs/multimodal_network_vrnn.png">
+<img src="docs/imgs/results.gif">
 
 This is the code associated with the following publications:
 
 **Conference Version:** "Social-VRNN: One-Shot Multi-modal Trajectory Prediction for Interacting Pedestrians", submitted to. [Link to Paper](-), [Link to Video](https://www.youtube.com/watch?v=XHoXkWLhwYQ)
 
-This repo also contains the scripts to train and evaluate quantitatively and qualitatively the proposed network architecture.
+This repository also contains the scripts to train and evaluate quantitatively and qualitatively the proposed network architecture.
 
 ---
 
