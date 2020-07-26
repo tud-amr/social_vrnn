@@ -1,6 +1,6 @@
 # Social-VRNN: One-Shot Multi-modal Trajectory Prediction for Interacting Pedestrians
 
-<img src="docs/imgs/results.gif">
+<img align="center" src="docs/imgs/results.gif">
 
 This is the code associated with the following publications:
 
