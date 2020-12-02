@@ -1,7 +1,7 @@
 tensorflow==1.15.0
 tensorflow_probability==0.7.0
 colorama
-matplotlib==2.1.2
+matplotlib==3.3.3
 progressbar
 opencv-python
 pykalman

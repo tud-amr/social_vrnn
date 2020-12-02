@@ -29,6 +29,7 @@ from copy import deepcopy
 from multiprocessing.pool import ThreadPool
 import colorama
 from colorama import Fore, Style
+import tensorflow as tf
 
 # Suppress TensorFlow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'

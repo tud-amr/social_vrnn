@@ -7,16 +7,15 @@ from shapely.geometry.polygon import Polygon, LinearRing, LineString
 from shapely.geometry.point import Point
 
 
-
 def LoadTrafficData(filename, segment, time_from, time_to):
     """
     Load traffic data between dt_from and dt_to around a given segment
     """
 
     ## find a bounding box for segment
-    x_min = 10 ** 6;
+    x_min = 10 ** 6
     x_max = 0
-    y_min = 10 ** 6;
+    y_min = 10 ** 6
     y_max = 0
 
     x, y = segment.exterior.xy
