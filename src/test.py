@@ -35,11 +35,6 @@ else:
 	from src.data_utils.Performance import *
 	from src.data_utils.utils import *
 	from src.data_utils.Recorder import Recorder as rec
-	
-# Suppress TensorFlow warnings
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-
 
 # Model directories
 def parse_args():
@@ -87,6 +82,10 @@ if test_args.gpu:
 else:
 	os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 	import tensorflow as tf
+	
+# Suppress TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 cwd = os.getcwd()
 
