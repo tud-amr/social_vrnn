@@ -1174,7 +1174,7 @@ class Recorder():
 		print("Resolution: " + str(resolution))
 
 		im = np.uint8(cv2.imread(map_file) * -1 + 255)
-		im = cv2.rotate(im, cv2.ROTATE_90_COUNTERCLOCKWISE)
+		im = cv2.rotate(im, cv2.ROTATE_90_CLOCKWISE) # for roboat output
 		frame_height, frame_width, layers = im.shape
 		scale_factor = 2
 		resized_img = cv2.resize(im, (frame_width * scale_factor, frame_height * scale_factor),
