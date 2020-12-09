@@ -13,14 +13,16 @@ class OccupancyGrid():
     self.resolution = None
     self.map_size = None
     self.center = np.array([0.0, 0.0])
+    self.tl_rw = None
+    self.br_rw = None
     
-  def getIdx(self, pos_x, pos_y, tl_rw, br_rw):
+  def getIdx(self, pos_x, pos_y):
     """
     Get indices of position. 
     pos_x and pos_y are the positions w.r.t. the center of the map.
     """
-    idx_x = int((pos_x - tl_rw[0, 0]) / self.resolution)
-    idx_y = int((pos_y - br_rw[1, 0]) / self.resolution)
+    idx_x = int((pos_x - self.tl_rw[0, 0]) / self.resolution)
+    idx_y = int((pos_y - self.br_rw[1, 0]) / self.resolution)
     
     # Projecting index on map if out of bounds
     idx_x = int(min(idx_x, self.gridmap.shape[0] - 1))

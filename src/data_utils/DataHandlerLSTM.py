@@ -543,7 +543,9 @@ class DataHandlerLSTM():
 		tl_px = self.cv_to_norm_px(np.array([[0], [0]]), static_obst_img.shape)
 		br_px = self.cv_to_norm_px(np.array([[static_obst_img.shape[0]-1], [static_obst_img.shape[1]-1]]), static_obst_img.shape)
 		tl_rw = np.dot(H, np.vstack((tl_px, np.array([[1]]))))[0:2,:]
+		self.agent_container.occupancy_grid.tl_rw = tl_rw
 		br_rw = np.dot(H, np.vstack((br_px, np.array([[1]]))))[0:2,:]
+		self.agent_container.occupancy_grid.br_rw = br_rw
 		if (br_rw[0, 0] < tl_rw[0, 0] or br_rw[1, 0] > tl_rw[1, 0]):
 			print('One or more of the axes are flipeed! Check your H matrix.')
 			exit()
