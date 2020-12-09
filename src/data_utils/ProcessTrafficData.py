@@ -1,13 +1,30 @@
 from datetime import datetime
 
-import numpy as np
 import sqlite3
+import pickle
+import numpy as np
+from PIL import Image
+from matplotlib import pyplot as plt
+from descartes import PolygonPatch
 
-from shapely.geometry.polygon import Polygon, LinearRing, LineString
+from shapely.geometry.polygon import LineString
 from shapely.geometry.point import Point
 
 
-def LoadTrafficData(filename, segment, time_from, time_to):
+def mergeSegment(idx_segments, map_path):
+    with open(map_path, 'rb') as file_pickle:
+        segments = pickle.load(file_pickle)
+
+    segment = None
+    for i in idx_segments:
+        if segment is None:
+            segment = segments[i]
+        else:
+            segment = segment.union(segments[i])
+    return segment
+
+
+def LoadTrafficData(dataset_path, segment, time_from, time_to):
     """
     Load traffic data between dt_from and dt_to around a given segment
     """
@@ -25,7 +42,7 @@ def LoadTrafficData(filename, segment, time_from, time_to):
     y_max = max(y_max, max(y))
 
     ## read traffic data
-    conn_db = sqlite3.connect(filename,
+    conn_db = sqlite3.connect(dataset_path,
                               detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
     cur = conn_db.cursor()
     cur.execute(
@@ -145,7 +162,7 @@ def FilterTraffic(traffic_data_raw, segment, resolution):
     return traffic_data_filtered
 
 
-def GenerateObsmat(traffic_data, save=True):
+def GenerateObsmat(traffic_data, data_path, save=True):
     """
     Convert filtered traffic data into a obsmat format and optionally save the data as a text file.
     """
@@ -167,6 +184,58 @@ def GenerateObsmat(traffic_data, save=True):
 
     obsmat = obsmat[obsmat[:, 0].argsort()]
     if save:
-        np.savetxt('obsmat.txt', obsmat, fmt='%e')
+        np.savetxt(data_path / 'obsmat.txt', obsmat, fmt='%e')
 
     return obsmat
+
+
+def createMap(idx_segments, data_path):
+    canal_map = data_path / 'canal_map'
+    with open(canal_map, 'rb') as file_pickle:
+        segments = pickle.load(file_pickle)
+
+    segment = None
+    for i in segments:
+        if segment is None:
+            segment = segments[i]
+        else:
+            segment = segment.union(segments[i])
+
+    segment = None
+    for i in idx_segments:
+        if segment is None:
+            segment = segments[i]
+        else:
+            segment = segment.union(segments[i])
+
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111)
+    fig.set_facecolor('xkcd:white')
+
+    ## plot canal segment
+    ax.add_patch(PolygonPatch(segment, alpha=1.0, color='black'))
+
+    plt.axis("equal")
+    plt.axis("off")
+    fig.savefig(data_path / 'map.png', dpi=40, bbox_inches='tight',
+                pad_inches=0)
+
+    # Create homography matrix
+    H = np.zeros((3, 3))
+    H[2][2] = 1
+
+    im = Image.open(data_path / 'map.png')
+    x_pixels, y_pixels = im.size
+
+    y_min, y_max = ax.get_ylim()
+    x_min, x_max = ax.get_xlim()
+    x_width = abs(x_min - x_max)
+    y_width = abs(y_min - y_max)
+
+    H[0][0] = x_width / x_pixels
+    H[1][1] = -y_width / y_pixels
+
+    H[0][2] = x_min
+    H[1][2] = y_max
+
+    np.savetxt(data_path / 'H.txt', H, delimiter='  ')
