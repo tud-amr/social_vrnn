@@ -512,6 +512,12 @@ class DataHandlerLSTM():
 
 			self.calc_scale()
 
+	def cv_to_norm_px(self, coordinate, img_shape):
+		return np.array([[coordinate[1, 0]], [img_shape[0] - coordinate[0, 0]]])
+
+	def add_z_axis(self, coordinate):
+		return np.vstack((coordinate, np.array([[1]])))
+
 	def _process_real_data_(self):
 		"""
 		Import the real-world data from the log file stored in the directory of data_path.
@@ -520,50 +526,43 @@ class DataHandlerLSTM():
 		print("Extracting the occupancy grid ...")
 		# Occupancy grid data
 		self.agent_container.occupancy_grid.resolution = 0.1  # map resolution in [m / cell]
-		self.agent_container.occupancy_grid.map_size = np.array([50., 50.])  # map size in [m]
-		self.agent_container.occupancy_grid.gridmap = np.zeros([int(self.agent_container.occupancy_grid.map_size[0] / self.agent_container.occupancy_grid.resolution),
-																														int(self.agent_container.occupancy_grid.map_size[1] / self.agent_container.occupancy_grid.resolution)])  # occupancy values of cells
-		self.agent_container.occupancy_grid.center = self.agent_container.occupancy_grid.map_size / 2.0
-
-		self.batch_grid = np.zeros([self.batch_size, self.tbpl,
-																int(np.ceil(self.submap_width / self.agent_container.occupancy_grid.resolution)),
-																int(np.ceil(self.submap_height / self.agent_container.occupancy_grid.resolution))])
-
-		# Extract grid from real data
-		# Homography matrix to transform from image to world coordinates
-		H = np.genfromtxt(os.path.join(self.data_path +self.args.scenario, 'H.txt'), delimiter='  ', unpack=True).transpose()
-
 		# Extract static obstacles
 		obst_threshold = 200
+
+		self.batch_grid = np.zeros([
+			self.batch_size, self.tbpl,
+			int(np.ceil(self.submap_width / self.agent_container.occupancy_grid.resolution)),
+			int(np.ceil(self.submap_height / self.agent_container.occupancy_grid.resolution))]
+		)
+
+		# Get homography matrix to transform from image to world coordinates
+		H = np.genfromtxt(os.path.join(self.data_path +self.args.scenario, 'H.txt'), delimiter='  ', unpack=True).transpose()
+		# Get map image
 		static_obst_img = cv2.imread(os.path.join(self.data_path+self.args.scenario, 'map.png'), 0)
-		obstacles = np.zeros([0, 3])
-		# pixel coordinates do cartesian coordinates
-		for xx in range(static_obst_img.shape[0]):
-			for yy in range(static_obst_img.shape[1]):
-				if static_obst_img[xx, yy] > obst_threshold:
-					obstacles = np.append(obstacles, np.dot(H, np.array([[xx], [yy], [1]])).transpose(), axis=0)
 
-		# Compute obstacles in 2D
-		self.obstacles_2d = np.zeros([obstacles.shape[0], 2])
-		self.obstacles_2d[:, 0] = obstacles[:, 0] / obstacles[:, 2]
-		self.obstacles_2d[:, 1] = obstacles[:, 1] / obstacles[:, 2]
+		tl_px = self.cv_to_norm_px(np.array([[0], [0]]), static_obst_img.shape)
+		br_px = self.cv_to_norm_px(np.array([[static_obst_img.shape[0]-1], [static_obst_img.shape[1]-1]]), static_obst_img.shape)
+		tl_rw = np.dot(H, np.vstack((tl_px, np.array([[1]]))))[0:2,:]
+		br_rw = np.dot(H, np.vstack((br_px, np.array([[1]]))))[0:2,:]
+		if (br_rw[0, 0] < tl_rw[0, 0] or br_rw[1, 0] > tl_rw[1, 0]):
+			print('One or more of the axes are flipeed! Check your H matrix.')
+			exit()
 
-		for obst_ii in range(self.obstacles_2d.shape[0]):
-			obst_idx = self.agent_container.occupancy_grid.getIdx(self.obstacles_2d[obst_ii,0], self.obstacles_2d[obst_ii,1])
-			self.agent_container.occupancy_grid.gridmap[obst_idx] = 1.0
-		"""
-		fig = pl.figure("Global Trajectory Predictions")
-		ax_in = pl.subplot()
+		# Dynamically set occupancy grid size
+		og_x_size = (br_rw-tl_rw)[0, 0]
+		og_y_size = (tl_rw-br_rw)[1, 0]
+		self.agent_container.occupancy_grid.map_size = np.array([og_x_size, og_y_size])  # map size in meters, [0] = x (→), [1] = y (↑)
+		self.agent_container.occupancy_grid.center = self.agent_container.occupancy_grid.map_size / 2.0
 
-		ax_in.clear()
-		# plot scenario grid
-		sup.plot_grid(ax_in, np.array([0.0, 0.0]), self.agent_container.occupancy_grid.gridmap, self.agent_container.occupancy_grid.resolution, self.agent_container.occupancy_grid.map_size)
-		x_lim = [-self.agent_container.occupancy_grid.map_size[0] / 2, self.agent_container.occupancy_grid.map_size[0]/ 2]
-		y_lim = [-self.agent_container.occupancy_grid.map_size[1]/ 2, self.agent_container.occupancy_grid.map_size[1] / 2]
-		ax_in.set_xlim(x_lim)
-		ax_in.set_ylim(y_lim)
-		pl.show()
-		"""
+		gridmap_us = cv2.resize(
+			static_obst_img, 
+			(int(og_x_size/self.agent_container.occupancy_grid.resolution), int(og_y_size/self.agent_container.occupancy_grid.resolution)), 
+			fx=0, fy=0, interpolation = cv2.INTER_NEAREST
+		)
+		gridmap_us = np.rot90(gridmap_us, k=-1)
+		gridmap_us[gridmap_us > 0.0] = 1.0
+		self.agent_container.occupancy_grid.gridmap = gridmap_us
+
 		print("Extracting the pedestrian data ...")
 		# Pedestrian data
 		# [id, timestep (s), timestep (ns), pos x, pos y, yaw, vel x, vel y, omega, goal x, goal y]
@@ -601,12 +600,13 @@ class DataHandlerLSTM():
 				pose[:, 1] = pedestrian_data[sample_idx, idx_posy] + 14
 			else:
 				pose[:,1] = pedestrian_data[sample_idx, idx_posy]
+			
 			vel[:, 0] = pedestrian_data[sample_idx, idx_vx]
 			vel[:, 1] = pedestrian_data[sample_idx, idx_vy]
-			if pixel_data:
-				converted_pose = sup.to_pos_frame(H, np.expand_dims(np.array((pedestrian_data[sample_idx, idx_posx], pedestrian_data[sample_idx, idx_posy])), axis=0).astype(float))
-				pose[:, 0] = converted_pose[0,0]
-				pose[:, 1] = converted_pose[0,1]
+			# if pixel_data:
+			# 	converted_pose = sup.to_pos_frame(H, np.expand_dims(np.array((pedestrian_data[sample_idx, idx_posx], pedestrian_data[sample_idx, idx_posy])), axis=0).astype(float))
+			# 	pose[:, 0] = converted_pose[0,0]
+			# 	pose[:, 1] = converted_pose[0,1]
 			goal = np.zeros([2])
 
 			self.agent_container.addDataSample(id, timestamp, pose, vel, goal)
@@ -638,15 +638,15 @@ class DataHandlerLSTM():
 
 		self.compute_min_max_values()
 
-		groups_path = os.path.join(self.data_path+self.args.scenario, 'groups.txt')
-		with open(groups_path,"r") as f:
-			all_data = [x.split() for x in f.readlines()]
-			lines = np.array([map(float,x) for x in all_data])
+		# groups_path = os.path.join(self.data_path+self.args.scenario, 'groups.txt')
+		# with open(groups_path,"r") as f:
+		# 	all_data = [x.split() for x in f.readlines()]
+		# 	lines = np.array([map(float,x) for x in all_data])
 		self.groups = []
 
-		for line in lines:
-			if line:
-				self.groups.append(np.array(line))
+		# for line in lines:
+		# 	if line:
+		# 		self.groups.append(np.array(line))
 
 	def calc_scale(self, keep_ratio=True):
 		self.sx_vel = 1 / (self.max_vel_x - self.min_vel_x)
