@@ -233,9 +233,9 @@ def createMap(idx_segments, data_path):
     y_width = abs(y_min - y_max)
 
     H[0][0] = x_width / x_pixels
-    H[1][1] = -y_width / y_pixels
+    H[1][1] = y_width / y_pixels
 
     H[0][2] = x_min
-    H[1][2] = y_max
+    H[1][2] = y_min
 
     np.savetxt(data_path / 'H.txt', H, delimiter='  ')
