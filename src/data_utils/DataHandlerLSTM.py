@@ -551,7 +551,6 @@ class DataHandlerLSTM():
 		for obst_ii in range(self.obstacles_2d.shape[0]):
 			obst_idx = self.agent_container.occupancy_grid.getIdx(self.obstacles_2d[obst_ii,0], self.obstacles_2d[obst_ii,1])
 			self.agent_container.occupancy_grid.gridmap[obst_idx] = 1.0
-
 		"""
 		fig = pl.figure("Global Trajectory Predictions")
 		ax_in = pl.subplot()
@@ -569,7 +568,7 @@ class DataHandlerLSTM():
 		# Pedestrian data
 		# [id, timestep (s), timestep (ns), pos x, pos y, yaw, vel x, vel y, omega, goal x, goal y]
 		if os.path.exists(self.data_path +self.args.scenario+'/obsmat.txt'):
-			pedestrian_data = np.genfromtxt(os.path.join(self.data_path +self.args.scenario, 'obsmat.txt'), delimiter="  ")[1:, :]
+			pedestrian_data = np.genfromtxt(os.path.join(self.data_path +self.args.scenario, 'obsmat.txt'), delimiter=" ")[1:, :]
 			pixel_data = False
 		elif os.path.exists(self.data_path +self.args.scenario+'/obsmat_px.txt'):
 			pedestrian_data = np.genfromtxt(os.path.join(self.data_path + self.args.scenario, 'obsmat_px.txt'), delimiter="  ")[1:, :]

@@ -157,11 +157,12 @@ def GenerateObsmat(traffic_data, save=True):
         dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data[key])
 
         keys = np.full_like(x, fill_value=key)
+        zeros = np.zeros_like(x)
         frames = [int((date - basetime).total_seconds()) for date in dt]
         if obsmat is None:
-            obsmat = np.vstack((frames, keys, x, y, vx, vy)).transpose()
+            obsmat = np.vstack((frames, keys, x, zeros, y, vx, zeros, vy)).transpose()
         else:
-            stacked = np.vstack((frames, keys, x, y, vx, vy)).transpose()
+            stacked = np.vstack((frames, keys, x, zeros, y, vx, zeros, vy)).transpose()
             obsmat = np.vstack((obsmat, stacked))
 
     obsmat = obsmat[obsmat[:, 0].argsort()]

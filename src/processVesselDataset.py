@@ -6,7 +6,7 @@ sys.path.append('../')
 
 from src.data_utils.ProcessTrafficData import LoadTrafficData, FilterTraffic, GenerateObsmat
 
-datadir = '/Users/jules/TU Delft/Research/Code/social_traj_planning/data/'
+datadir = '/Users/tuhindas/Documents/Tuhin/Computer Science/Year 3/Roboat/social_traj_planning/data/'
 
 filename = datadir + 'traffic_data.sqlite3'
 
