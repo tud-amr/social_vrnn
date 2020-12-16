@@ -103,9 +103,9 @@ normalize_data = False
 real_world_data = False
 regulate_log_loss = False
 # Map parameters
-submap_resolution = 0.1
-submap_width = 6
-submap_height = 6
+submap_resolution = 1
+submap_width = 60
+submap_height = 60
 diversity_update = False
 predict_positions = False
 warm_start_convnet = True

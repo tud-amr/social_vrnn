@@ -525,7 +525,7 @@ class DataHandlerLSTM():
 		"""
 		print("Extracting the occupancy grid ...")
 		# Occupancy grid data
-		self.agent_container.occupancy_grid.resolution = 0.1  # map resolution in [m / cell]
+		self.agent_container.occupancy_grid.resolution = 1  # map resolution in [m / cell]
 		# Extract static obstacles
 		obst_threshold = 200
 
