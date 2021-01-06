@@ -7,6 +7,7 @@ social_vrnn.egg-info
 *.csv
 
 .vscode/
+.idea
 
 # Compiled source #
 ###################
