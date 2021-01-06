@@ -1072,7 +1072,7 @@ class Recorder():
 											continue
 										axis = (int(np.sqrt(sigma_x) /resolution),int(np.sqrt(sigma_y) /resolution))
 										center = (obsv_XY[0, 1], obsv_XY[0, 0])
-										cv2.ellipse(overlay_ellipses, center,       axis,    0, 0, 360, (255,153,51),-1)
+										cv2.ellipse(overlay_ellipses, center,      (5, 5),    0, 0, 360, (255,153,51),-1)
 
 										for pred_step in range(1, self.args.prediction_horizon):
 											sigma_x = sigma_x + np.square(min(max(sigmax[pred_step],0.5),2.0)) * self.args.dt * self.args.dt
@@ -1084,7 +1084,7 @@ class Recorder():
 											if (sigma_x<0) or (sigma_y<0):
 												print("Negative ellipse")
 											center = (obsv_XY[pred_step, 1], obsv_XY[pred_step, 0])
-											cv2.ellipse(overlay_ellipses, center, axis, 0, 0, 360, (255,153,51),-1)
+											cv2.ellipse(overlay_ellipses, center, (5, 5), 0, 0, 360, (255,153,51),-1)
 
 					# Plot other agents
 					plot_other_agents = False
@@ -1096,7 +1096,7 @@ class Recorder():
 						for agent_id in range(other_agents.shape[0]):
 							obsv_XY = sup.to_image_frame(Hinv, np.expand_dims(other_agents[agent_id,:2],axis=0))
 							center = (obsv_XY[0, 1], obsv_XY[0, 0])
-							cv2.ellipse(overlay_ellipses, center, axis, 0, 0, 360, (153, 153, 51), -1)
+							cv2.ellipse(overlay_ellipses, center, (5, 5), 0, 0, 360, (153, 153, 51), -1)
 
 					image_new = cv2.addWeighted(overlay, 0.6, im, 0.4, 0)
 					image_new = cv2.addWeighted(image_new, 0.6, overlay_ellipses, 0.4, 0)
@@ -1323,7 +1323,7 @@ class Recorder():
 											y = obsv_XY[0, 1]*scale_factor
 											x = obsv_XY[0, 0]*scale_factor
 											center = (y , x)
-											cv2.ellipse(overlay, center,       axis,    0, 0, 360, (255,153,51),-1)
+											cv2.ellipse(overlay, center,       (5, 5),    0, 0, 360, (255,153,51),-1)
 
 											for pred_step in range(1, self.args.prediction_horizon):
 												sigma_x += np.square(sigmax[pred_step]) * self.args.dt * self.args.dt
@@ -1337,7 +1337,7 @@ class Recorder():
 												y = obsv_XY[pred_step, 1] * scale_factor
 												x = obsv_XY[pred_step, 0] * scale_factor
 												center = (y, x)
-												cv2.ellipse(overlay, center, axis, 0, 0, 360, (255,153,51),-1)
+												cv2.ellipse(overlay, center, (5, 5), 0, 0, 360, (255,153,51),-1)
 									except:
 										print("Failed to add ellipse")
 
@@ -1351,7 +1351,7 @@ class Recorder():
 						for agent_id in range(other_agents.shape[0]):
 							obsv_XY = sup.to_image_frame(Hinv, np.expand_dims(other_agents[agent_id,:2],axis=0))
 							center = (int(obsv_XY[0, 1]*scale_factor), int(obsv_XY[0, 0]*scale_factor))
-							cv2.ellipse(overlay, center, axis, 0, 0, 360, (153, 153, 51), -1)
+							cv2.ellipse(overlay, center, (5, 5), 0, 0, 360, (153, 153, 51), -1)
 
 					# Adding legend
 					font = cv2.FONT_HERSHEY_SIMPLEX
@@ -1429,7 +1429,7 @@ class Recorder():
 					center = (obsv_XY[0, 1], obsv_XY[0, 0])
 					axis = (int(np.sqrt(0.3) / resolution),
 					        int(np.sqrt(0.3) / resolution))
-					cv2.ellipse(overlay, center, axis, 0, 0, 360, (255, 0, 0), -1)
+					cv2.ellipse(overlay, center, (5, 5), 0, 0, 360, (255, 0, 0), -1)
 
 					# Final positions
 					x0 = traj[-1]["pedestrian_state"]["position"][0]
@@ -1438,7 +1438,7 @@ class Recorder():
 					center = (obsv_XY[0, 1], obsv_XY[0, 0])
 					axis = (int(np.sqrt(0.3) / resolution),
 					        int(np.sqrt(0.3) / resolution))
-					cv2.ellipse(overlay, center, axis, 0, 0, 360, (0, 255, 0), -1)
+					cv2.ellipse(overlay, center, (5, 5), 0, 0, 360, (0, 255, 0), -1)
 
 					obsv_XY = sup.to_image_frame(Hinv, traj_real)
 					sup.line_cv(overlay, obsv_XY, (0, 0, 0), 3) # bgr convention
@@ -1518,7 +1518,7 @@ class Recorder():
 										continue
 									axis = (int(np.sqrt(sigma_x) /resolution),int(np.sqrt(sigma_y) /resolution))
 									center = (obsv_XY[0, 1], obsv_XY[0, 0])
-									cv2.ellipse(overlay, center,       axis,    0, 0, 360, (255,153,51),-1)
+									cv2.ellipse(overlay, center,       (5, 5),    0, 0, 360, (255,153,51),-1)
 
 									for pred_step in range(1, self.args.prediction_horizon):
 										sigma_x += np.square(min(sigmax[pred_step],0.5)) * self.args.dt * self.args.dt
@@ -1530,19 +1530,19 @@ class Recorder():
 										if (sigma_x<0) or (sigma_y<0):
 											print("Negative ellipse")
 										center = (obsv_XY[pred_step, 1], obsv_XY[pred_step, 0])
-										cv2.ellipse(overlay, center, axis, 0, 0, 360, (255,153,51),-1)
+										cv2.ellipse(overlay, center, (5, 5), 0, 0, 360, (255,153,51),-1)
 
 					# Plot other agents
 					plot_other_agents = True
 					if plot_other_agents:
 						other_agents = np.expand_dims(other_agents_list[animation_idx][0,step],axis=0)
-						axis = (int(np.sqrt(0.3) / resolution),
-						        int(np.sqrt(0.3) / resolution))
+						axis = (20 * int(np.sqrt(0.3) / resolution),
+						        20 * int(np.sqrt(0.3) / resolution))
 
 						for agent_id in range(other_agents.shape[0]):
 							obsv_XY = sup.to_image_frame(Hinv, np.expand_dims(other_agents[agent_id],axis=0))
 							center = (obsv_XY[0, 1], obsv_XY[0, 0])
-							cv2.ellipse(overlay, center, axis, 0, 0, 360, (153, 153, 51), -1)
+							cv2.ellipse(overlay, center, (5, 5), 0, 0, 360, (153, 153, 51), -1)
 
 					# Adding legend
 					font = cv2.FONT_HERSHEY_SIMPLEX
