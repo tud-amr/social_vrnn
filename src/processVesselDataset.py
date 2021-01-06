@@ -14,6 +14,7 @@ data_path = path / 'data/real_world/amsterdam_canals'
 map_path = data_path / 'canal_map'
 dataset = data_path / 'traffic_data.sqlite3'
 
+
 segment = mergeSegment(idx_segments, map_path)
 
 time_from = datetime(2017, 8, 12, 13)
