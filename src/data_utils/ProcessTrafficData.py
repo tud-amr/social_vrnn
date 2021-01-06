@@ -189,7 +189,7 @@ def GenerateObsmat(traffic_data, data_path, save=True):
     return obsmat
 
 
-def createMap(idx_segments, data_path):
+def createMap(idx_segments, data_path, dpi=40):
     canal_map = data_path / 'canal_map'
     with open(canal_map, 'rb') as file_pickle:
         segments = pickle.load(file_pickle)
@@ -208,16 +208,20 @@ def createMap(idx_segments, data_path):
         else:
             segment = segment.union(segments[i])
 
-    fig = plt.figure(figsize=(10, 10))
+    fig = plt.figure()
     ax = fig.add_subplot(111)
     fig.set_facecolor('xkcd:white')
+
+    ax.set_xlim([segment.bounds[0] - 10, segment.bounds[2] + 10])
+    ax.set_ylim([segment.bounds[1] - 10, segment.bounds[3] + 10])
 
     ## plot canal segment
     ax.add_patch(PolygonPatch(segment, alpha=1.0, color='black'))
 
-    plt.axis("equal")
+    plt.gca().set_aspect('equal')
     plt.axis("off")
-    fig.savefig(data_path / 'map.png', dpi=40, bbox_inches='tight',
+    plt.tight_layout()
+    fig.savefig(data_path / 'map1.png', dpi=dpi, bbox_inches='tight',
                 pad_inches=0)
 
     # Create homography matrix
