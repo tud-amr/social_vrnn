@@ -6,11 +6,6 @@ dist
 social_vrnn.egg-info
 *.csv
 
-# Negate amsterdam canals ignore
-!data/real_world/amsterdam_canals/
-data/real_world/amsterdam_canals/traffic_data.sqlite3
-data/real_world/amsterdam_canals/canal_map
-
 .vscode/
 
 # Compiled source #
@@ -50,3 +45,8 @@ data/real_world/amsterdam_canals/canal_map
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Negate amsterdam canals ignore
+!data/real_world/amsterdam_canals/
+data/real_world/amsterdam_canals/traffic_data.sqlite3
+data/real_world/amsterdam_canals/canal_map
