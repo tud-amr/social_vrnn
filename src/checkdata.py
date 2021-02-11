@@ -13,6 +13,10 @@ from datetime import datetime
 from shapely.geometry.polygon import LineString
 from shapely.geometry.point import Point
 
+import os, sys, inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+if parentdir not in sys.path: sys.path.insert(0, parentdir)
 from src.data_utils.ProcessTrafficData import mergeSegment, LoadTrafficData, GenerateObsmat, \
     createMap
 
@@ -35,10 +39,9 @@ traffic_data_raw = LoadTrafficData(dataset, segment, time_from, time_to)
 traffic_data_filtered = traffic_data_raw
 obsmat = GenerateObsmat(traffic_data_filtered, data_path, save=False)
 createMap(idx_segments, data_path)
-exit()
 
 
-canal_map = '/Users/tuhindas/Documents/Tuhin/Computer Science/Year 3/Roboat/social_vrnn/data/real_world/amsterdam_canals/canal_map'
+canal_map = path / 'data/real_world/amsterdam_canals/canal_map'
 with open(canal_map, 'rb') as file_pickle:
     segments = pickle.load(file_pickle)
 

@@ -42,7 +42,7 @@ def LoadTrafficData(dataset_path, segment, time_from, time_to):
     y_max = max(y_max, max(y))
 
     ## read traffic data
-    conn_db = sqlite3.connect(dataset_path,
+    conn_db = sqlite3.connect(str(dataset_path),
                               detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
     cur = conn_db.cursor()
     cur.execute(
