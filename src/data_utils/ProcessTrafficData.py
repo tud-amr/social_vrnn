@@ -173,6 +173,13 @@ def GenerateObsmat(traffic_data, data_path, save=True):
     for key in traffic_data.keys():
         dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data[key])
 
+        shiftx = np.roll(x, -1)
+        shifty = np.roll(y, -1)
+        vx = shiftx - x
+        vy = shifty - y
+        vx[-1] = 0
+        vy[-1] = 0
+
         keys = np.full_like(x, fill_value=key)
         zeros = np.zeros_like(x)
         frames = [int((date - basetime).total_seconds()) for date in dt]

@@ -14,13 +14,15 @@ from shapely.geometry.polygon import LineString
 from shapely.geometry.point import Point
 
 import os, sys, inspect
+
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 if parentdir not in sys.path: sys.path.insert(0, parentdir)
 from src.data_utils.ProcessTrafficData import mergeSegment, LoadTrafficData, GenerateObsmat, \
-    createMap
+    createMap, FilterTraffic
 
 idx_segments = [145, 147, 148, 152]
+resolution = [10, 10, .1, np.pi / 48]
 # idx_segments = range(0, 261)
 
 path = pathlib.Path(__file__).parent.parent.absolute()
@@ -35,11 +37,10 @@ time_from = datetime(2017, 8, 12, 13)
 time_to = datetime(2017, 8, 12, 14)
 
 traffic_data_raw = LoadTrafficData(dataset, segment, time_from, time_to)
-# traffic_data_filtered = FilterTraffic(traffic_data_raw, segment, resolution)
+traffic_data_filtered = FilterTraffic(traffic_data_raw, segment, resolution)
 traffic_data_filtered = traffic_data_raw
 obsmat = GenerateObsmat(traffic_data_filtered, data_path, save=False)
 createMap(idx_segments, data_path)
-
 
 canal_map = path / 'data/real_world/amsterdam_canals/canal_map'
 with open(canal_map, 'rb') as file_pickle:
@@ -59,9 +60,14 @@ for i in idx_segments:
     else:
         segment = segment.union(segments[i])
 
+print(obsmat[0:50])
+exit()
+
 
 x = obsmat[:, 2]
 y = obsmat[:, 4]
+x = x[3000:5000]
+y = y[3000:5000]
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
