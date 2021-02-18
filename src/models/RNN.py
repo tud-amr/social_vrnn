@@ -363,7 +363,7 @@ class NetworkModel():
 
     return batch_loss, summary
 
-  def train_step(self,sess,feed_dict_train):
+  def train_step(self,sess,feed_dict_train, step=0):
     _, batch_loss,  _current_state, _current_state_lstm_grid, _current_state_lstm_ped, \
     _current_state_lstm_concat,\
     _model_prediction, _summary_str, lr, output_decoder, autoencoder_loss = sess.run([self.update,

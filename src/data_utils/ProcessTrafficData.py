@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import sqlite3
 import pickle
@@ -173,12 +173,20 @@ def GenerateObsmat(traffic_data, data_path, save=True):
     for key in traffic_data.keys():
         dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data[key])
 
+        timesteps = np.roll(dt, -1)[:-1] - dt[:-1]
+        assert np.all(timesteps == timedelta(seconds=1), axis=0)
+
         shiftx = np.roll(x, -1)
         shifty = np.roll(y, -1)
         vx = shiftx - x
         vy = shifty - y
         vx[-1] = 0
         vy[-1] = 0
+
+        x = np.asarray(x) / 20
+        y = np.asarray(y) / 20
+        vx /= 20
+        vy /= 20
 
         keys = np.full_like(x, fill_value=key)
         zeros = np.zeros_like(x)
@@ -219,8 +227,10 @@ def createMap(idx_segments, data_path, dpi=40):
     ax = fig.add_subplot(111)
     fig.set_facecolor('xkcd:white')
 
-    ax.set_xlim([segment.bounds[0] - 10, segment.bounds[2] + 10])
-    ax.set_ylim([segment.bounds[1] - 10, segment.bounds[3] + 10])
+    scaling = 20
+
+    ax.set_xlim([(segment.bounds[0] - 10)/scaling, (segment.bounds[2] + 10)/scaling])
+    ax.set_ylim([(segment.bounds[1] - 10)/scaling, (segment.bounds[3] + 10)/scaling])
 
     ## plot canal segment
     ax.add_patch(PolygonPatch(segment, alpha=1.0, color='black'))

@@ -103,9 +103,9 @@ normalize_data = False
 real_world_data = False
 regulate_log_loss = False
 # Map parameters
-submap_resolution = 1
-submap_width = 60
-submap_height = 60
+submap_resolution = 0.1
+submap_width = 6
+submap_height = 6
 diversity_update = False
 predict_positions = False
 warm_start_convnet = True
@@ -393,7 +393,7 @@ with tf.Session(config=config) as sess:
 
 		start_time_training = time.time()
 
-		model_output = model.train_step(sess, feed_dict_train,step)
+		model_output = model.train_step(sess, feed_dict_train, step)
 
 		avg_training_time = time.time() - start_time_training
 		avg_loop_time = time.time() - start_time_loop

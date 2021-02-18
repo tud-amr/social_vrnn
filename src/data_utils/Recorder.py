@@ -1149,7 +1149,7 @@ class Recorder():
 
 	def plot_on_image(self,input_list,grid_list,y_pred_list_global,y_ground_truth_list,other_agents_list,traj_list,test_args,social_trajectories=None):
 
-		self.args.dt /= 10
+		# self.args.dt /= 10
 
 		scenario = self.args.scenario.split('/')[-1]
 

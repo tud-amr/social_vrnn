@@ -1,5 +1,5 @@
 import pathlib
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,7 +14,6 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 if parentdir not in sys.path:
     sys.path.insert(0, parentdir)
-
 
 idx_segments = [145, 147, 148, 152]
 
@@ -32,46 +31,48 @@ resolution = [10, 10, .1, np.pi / 48]
 traffic_data_raw = LoadTrafficData(dataset, segment, time_from, time_to)
 traffic_data = FilterTraffic(traffic_data_raw, segment, resolution)
 
-
-for key in traffic_data.keys():
-    dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data[key])
-
-    x_int = [x[0]]
-    y_int = [y[0]]
-    shiftx = np.roll(x, -1)
-    shifty = np.roll(y, -1)
-    vx = shiftx - x
-    vy = shifty - y
-    vx[-1] = 0
-    vy[-1] = 0
-
-    for i in range(len(vx) - 1):
-        x_int.append(x_int[i] + 1 * vx[i])
-
-    for i in range(len(vy) - 1):
-        y_int.append(y_int[i] + 1 * vy[i])
-
-
-    fig, ax = plt.subplots()
-    route = plt.scatter(x, y, color="red", alpha=0.5, s=0.2)
-    ax.add_patch(PolygonPatch(segment, fill=False, alpha=1.0, color='black'))
-    plt.savefig(str(key), dpi=400)
-    plt.clf()
-
-    fig, ax = plt.subplots()
-    route = plt.scatter(x_int, y_int, color="green", alpha=0.5, s=0.2)
-    ax.add_patch(PolygonPatch(segment, fill=False, alpha=1.0, color='black'))
-    plt.savefig(str(key) + '_interpolated', dpi=400)
-    plt.clf()
-    exit()
-
-exit()
+# for key in traffic_data.keys():
+#     dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data[key])
+#
+#     x_int = [x[0]]
+#     y_int = [y[0]]
+#     shiftx = np.roll(x, -1)
+#     shifty = np.roll(y, -1)
+#     vx = shiftx - x
+#     vy = shifty - y
+#     vx[-1] = 0
+#     vy[-1] = 0
+#
+#     for i in range(len(vx) - 1):
+#         x_int.append(x_int[i] + 1 * vx[i])
+#
+#     for i in range(len(vy) - 1):
+#         y_int.append(y_int[i] + 1 * vy[i])
+#
+#
+#     fig, ax = plt.subplots()
+#     route = plt.scatter(x, y, color="red", alpha=0.5, s=0.2)
+#     ax.add_patch(PolygonPatch(segment, fill=False, alpha=1.0, color='black'))
+#     plt.savefig(str(key), dpi=400)
+#     plt.clf()
+#
+#     fig, ax = plt.subplots()
+#     route = plt.scatter(x_int, y_int, color="green", alpha=0.5, s=0.2)
+#     ax.add_patch(PolygonPatch(segment, fill=False, alpha=1.0, color='black'))
+#     plt.savefig(str(key) + '_interpolated', dpi=400)
+#     plt.clf()
+#     exit()
+#
+# exit()
 
 key = list(traffic_data.keys())[0]
 
 dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data[key])
 
-speedup = 1
+timesteps = np.roll(dt, -1)[:-1] - dt[:-1]
+assert np.all(timesteps == timedelta(seconds=1), axis=0)
+
+speedup = 150
 
 fig, ax = plt.subplots()
 route = plt.scatter(x, y, color="red", alpha=0.5, s=0.5)
