@@ -42,7 +42,7 @@ def LoadTrafficData(dataset_path, segment, time_from, time_to):
     y_max = max(y_max, max(y))
 
     ## read traffic data
-    conn_db = sqlite3.connect(dataset_path,
+    conn_db = sqlite3.connect(str(dataset_path),
                               detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
     cur = conn_db.cursor()
     cur.execute(
@@ -172,6 +172,13 @@ def GenerateObsmat(traffic_data, data_path, save=True):
 
     for key in traffic_data.keys():
         dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data[key])
+
+        shiftx = np.roll(x, -1)
+        shifty = np.roll(y, -1)
+        vx = shiftx - x
+        vy = shifty - y
+        vx[-1] = 0
+        vy[-1] = 0
 
         keys = np.full_like(x, fill_value=key)
         zeros = np.zeros_like(x)

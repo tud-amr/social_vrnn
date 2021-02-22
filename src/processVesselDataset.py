@@ -6,7 +6,7 @@ resolution = [10, 10, .1, np.pi / 40]
 
 # idx_segments = [152]
 idx_segments = [145, 147, 148, 152]
-idx_segments = range(0, 261)
+# idx_segments = range(0, 261)
 
 path = pathlib.Path(__file__).parent.parent.absolute()
 data_path = path / 'data/real_world/amsterdam_canals'
@@ -21,9 +21,11 @@ time_from = datetime(2017, 8, 12, 13)
 time_to = datetime(2017, 8, 12, 14)
 
 traffic_data_raw = LoadTrafficData(dataset, segment, time_from, time_to)
-# traffic_data_filtered = FilterTraffic(traffic_data_raw, segment, resolution)
-traffic_data_filtered = traffic_data_raw
-obsmat = GenerateObsmat(traffic_data_filtered, data_path, save=False)
+print("Traffic data loaded")
+traffic_data_filtered = FilterTraffic(traffic_data_raw, segment, resolution)
+print("Data filtered")
+obsmat = GenerateObsmat(traffic_data_filtered, data_path, save=True)
+print("Obsmat done")
 createMap(idx_segments, data_path)
 
 exit()
