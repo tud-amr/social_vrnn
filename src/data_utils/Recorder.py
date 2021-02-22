@@ -1182,7 +1182,7 @@ class Recorder():
 
 		if os.path.exists(map_file):
 			print('[INF] Using video file ' + video_file)
-			cap = cv2.VideoWriter(video_file, cv2.VideoWriter_fourcc('M', 'P', '4', '2'), 20,
+			cap = cv2.VideoWriter(video_file, cv2.VideoWriter_fourcc('M', 'P', '4', '2'), 5,
 			                      (frame_width * scale_factor, frame_height * scale_factor))
 
 			vel_real = np.zeros((self.args.prediction_horizon,  self.args.output_dim))

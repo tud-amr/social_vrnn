@@ -54,7 +54,7 @@ class NetworkModel():
     # Specify placeholders
     self.input_state_placeholder = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.truncated_backprop_length, self.input_state_dim*(self.prev_horizon+1)], name='input_state')
     self.input_grid_placeholder = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.truncated_backprop_length, self.grid_width, self.grid_height], name='input_grid')
-    self.input_ped_grid_placeholder = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.truncated_backprop_length, self.pedestrian_vector_dim], name='ped_grid')
+    self.input_ped_grid_placeholder = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.truncated_backprop_length, self.pedestrian_vector_dim*self.args.n_other_agents], name='ped_grid')
     self.output_placeholder = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.truncated_backprop_length, self.output_placeholder_dim], name='output')
     self.dropout_placeholder = tf.placeholder(dtype=tf.float32, name='dropout')
     self.step = tf.placeholder(dtype=tf.float32,
@@ -128,7 +128,7 @@ class NetworkModel():
         # Pedestrian grid embedding layer
         ped_grid_out_dim = 128
         self.W_pedestrian_grid = self.get_weight_variable(name='w_ped_grid',
-                                                          shape=[self.pedestrian_vector_dim, ped_grid_out_dim],
+                                                          shape=[self.pedestrian_vector_dim*self.args.n_other_agents, ped_grid_out_dim],
                                                           trainable=True)
         self.b_pedestrian_grid = self.get_bias_variable(name='b_ped_grid', shape=[1, ped_grid_out_dim], trainable=True)
 
@@ -348,8 +348,9 @@ class NetworkModel():
           self.test_hidden_state_current_lstm_concat[sequence_idx, :] = np.zeros([1, self.rnn_state_size_lstm_concat])
 
   def validation_step(self,sess,feed_dict_validation):
-    batch_loss,  _current_state, _current_state_lstm_grid, _current_state_lstm_ped, \
+    batch_loss, _model_prediction, _current_state, _current_state_lstm_grid, _current_state_lstm_ped, \
     _current_state_lstm_concat, summary = sess.run([self.total_loss,
+                                                    self.prediction,
                                            self.current_state,
                                            self.current_state_lstm_grid,
                                            self.current_state_lstm_ped,
@@ -361,9 +362,9 @@ class NetworkModel():
     self.test_cell_state_current_lstm_ped, self.test_hidden_state_current_lstm_ped = _current_state_lstm_ped
     self.test_cell_state_current_lstm_concat, self.test_hidden_state_current_lstm_concat = _current_state_lstm_concat
 
-    return batch_loss, summary
+    return batch_loss, summary, _model_prediction
 
-  def train_step(self,sess,feed_dict_train):
+  def train_step(self,sess,feed_dict_train, step=0):
     _, batch_loss,  _current_state, _current_state_lstm_grid, _current_state_lstm_ped, \
     _current_state_lstm_concat,\
     _model_prediction, _summary_str, lr, output_decoder, autoencoder_loss = sess.run([self.update,
@@ -420,7 +421,7 @@ class NetworkModel():
       self.test_cell_state_current_lstm_ped, self.test_hidden_state_current_lstm_ped = _current_state_lstm_ped
       self.test_cell_state_current_lstm_concat, self.test_hidden_state_current_lstm_concat = _current_state_lstm_concat
 
-    return _model_prediction
+    return _model_prediction, 0
 
   def warmstart_model(self, args, sess):
     # Restore whole model

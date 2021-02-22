@@ -99,7 +99,7 @@ else:
 	model_parameters = pkl.load(file, encoding='latin1')
 file.close()
 args = model_parameters["args"]
-args.model_name = "SocialVRNN"
+
 args.model_path = '../trained_models/' + args.model_name + "/" + str(args.exp_num)
 args.log_dir = args.model_path + '/log'
 

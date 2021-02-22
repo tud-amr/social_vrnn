@@ -552,6 +552,7 @@ class NetworkModel():
 
 		# Train autoencoder if loss larger than threshold
 		""""""
+		print("Autoencoder loss: " + str(np.mean(autoencoder_loss)))
 		if np.mean(autoencoder_loss) > 0.05:
 			self.run_autoencoder(sess, feed_dict_train)
 			self.convnet_saver.save(sess, self.args.pretrained_convnet_path + '/final-model.ckpt')
