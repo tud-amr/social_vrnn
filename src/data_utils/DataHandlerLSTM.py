@@ -3,7 +3,9 @@ import os
 import random
 import sys
 import math
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages') # in order to import cv2 under python3
 import cv2
+sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages') # append back in order to import
 import pickle as pkl
 from pykalman import KalmanFilter
 if sys.version_info[0] < 3:
@@ -585,7 +587,7 @@ class DataHandlerLSTM():
 		idx_vx = 5
 		idx_vy = 7
 		idx_vz = 6
-		self.dt = 0.4 # seconds (equivalent to 2.5 fps)
+		self.dt = 1.0 # seconds (equivalent to 2.5 fps)
 		if os.path.split(self.data_path)[-1] == 'seq_eth':
 			frames_between_annotation = 6.0
 		else:
@@ -594,7 +596,7 @@ class DataHandlerLSTM():
 		# Iterate through the data and fill the register
 		for sample_idx in range(pedestrian_data.shape[0]):
 			id = pedestrian_data[sample_idx, idx_id]
-			timestamp = pedestrian_data[sample_idx, idx_frame] * self.dt / frames_between_annotation  # time in seconds
+			timestamp = pedestrian_data[sample_idx, idx_frame] #* self.dt / frames_between_annotation  # time in seconds
 			pose = np.zeros([1,3])
 			vel = np.zeros([1,3])
 			pose[:,0] = pedestrian_data[sample_idx, idx_posx]

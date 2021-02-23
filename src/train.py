@@ -41,7 +41,7 @@ data_path = '../data/cyberzoo_experiments/'
 scenario = 'all_trajectories'
 exp_num = 6
 data_path = '../data/'
-scenario = '20_ped_with_obstacles/short_few_obstacles'
+scenario = 'real_world/amsterdam_canals'
 
 # Hyperparameters
 n_epochs = 2
