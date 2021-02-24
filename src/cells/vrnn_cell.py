@@ -61,6 +61,6 @@ class VariationalRNNCell(tf.contrib.rnn.RNNCell):
                 z_1 = tf.nn.relu(linear(z, self.n_z_1))
 
             # propagate hidden state eq(7)
-            output, state2 = self.lstm(tf.concat(axis=1, values=(x_1, z_1)), state) # tf.concat(axis=1, values=(x_1, z_1)
+            output, state2 = self.lstm(x_1, state) # tf.concat(axis=1, values=(x_1, z_1)
 
         return (enc_mu, enc_sigma, output, prior_mu, prior_sigma), state2
