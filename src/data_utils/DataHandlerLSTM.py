@@ -635,10 +635,10 @@ class DataHandlerLSTM():
 
 		# add velocities to st dataset by using kalman filter
 		#if self.args.scenario == "st" :
-		#	for traj_id in range(len(self.trajectory_set)):
-				#filtered_state_means = self.filter_data(self.trajectory_set[traj_id][1].pose_vec[:,:2])
-				#self.trajectory_set[traj_id][1].pose_vec[:,:2] = filtered_state_means[:,:2]
-				#self.trajectory_set[traj_id][1].vel_vec = filtered_state_means[:, 2:]
+		for traj_id in range(len(self.trajectory_set)):
+				filtered_state_means = self.filter_data(self.trajectory_set[traj_id][1].pose_vec[:,:2])
+				self.trajectory_set[traj_id][1].pose_vec[:,:2] = filtered_state_means[:,:2]
+				self.trajectory_set[traj_id][1].vel_vec = filtered_state_means[:, 2:]
 
 		self.compute_min_max_values()
 
@@ -871,8 +871,8 @@ class DataHandlerLSTM():
 			for prev_step in range(self.prev_horizon,-1,-1):
 				current_pos = np.array([trajectory.pose_vec[start_idx + tbp_step - prev_step, 0], trajectory.pose_vec[
 					                        start_idx + tbp_step - prev_step, 1]])
-				current_vel = np.array([trajectory.vel_vec[start_idx + tbp_step, 0], trajectory.vel_vec[
-					                        start_idx + tbp_step - prev_step - prev_step, 1]])
+				current_vel = np.array([trajectory.vel_vec[start_idx + tbp_step - prev_step, 0], trajectory.vel_vec[
+					                        start_idx + tbp_step - prev_step , 1]])
 
 				if self.args.normalize_data:
 					self.normalize_pos(current_pos)

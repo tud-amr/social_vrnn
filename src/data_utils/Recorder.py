@@ -1248,6 +1248,11 @@ class Recorder():
 
 					traj_real = traj.pose_vec[step:,:2]
 					obsv_XY2 = sup.to_image_frame(Hinv, traj_real)*scale_factor
+					obsv_XY3 = obsv_XY2[self.args.prev_horizon:self.args.prev_horizon+self.args.prediction_horizon]
+					delta = obsv_XY - obsv_XY3
+
+					if np.max(np.abs(delta))>0:
+						print("problem")
 					sup.line_cv(overlay, obsv_XY2, (0, 0, 0), 3)  # bgr convention
 
 					# Predicted trajectory
