@@ -1317,15 +1317,15 @@ class Recorder():
 									try:
 										if self.args.output_pred_state_dim > 2:
 											# prior of 0 on the uncertainty of the pedestrian velocity
-											sigma_x = np.square(sigmax[0]) * self.args.dt * self.args.dt +0.2
-											sigma_y = np.square(sigmay[0]) * self.args.dt * self.args.dt +0.2
+											sigma_x = np.square(sigmax[0]) * self.args.dt * self.args.dt +6.0
+											sigma_y = np.square(sigmay[0]) * self.args.dt * self.args.dt +3.0
 											if math.isnan(sigma_x) | math.isnan(sigma_y):
 												continue
 											axis = (int(np.sqrt(sigma_x) /resolution*scale_factor),int(np.sqrt(sigma_y) /resolution*scale_factor))
 											y = obsv_XY[0, 1]*scale_factor
 											x = obsv_XY[0, 0]*scale_factor
 											center = (y , x)
-											cv2.ellipse(overlay, center,       (5, 5),    0, 0, 360, (255,153,51),-1)
+											cv2.ellipse(overlay, center,       axis,    0, 0, 360, (255,153,51),-1)
 
 											for pred_step in range(1, self.args.prediction_horizon):
 												sigma_x += np.square(sigmax[pred_step]) * self.args.dt * self.args.dt
@@ -1336,10 +1336,11 @@ class Recorder():
 												        int(np.sqrt(sigma_y) / resolution*scale_factor))
 												if (sigma_x<0) or (sigma_y<0):
 													print("Negative ellipse")
+													axis = (5, 5)
 												y = obsv_XY[pred_step, 1] * scale_factor
 												x = obsv_XY[pred_step, 0] * scale_factor
 												center = (y, x)
-												cv2.ellipse(overlay, center, (5, 5), 0, 0, 360, (255,153,51),-1)
+												cv2.ellipse(overlay, center, axis, 0, 0, 360, (255,153,51),-1)
 									except:
 										print("Failed to add ellipse")
 
