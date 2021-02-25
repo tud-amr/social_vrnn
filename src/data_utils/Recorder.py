@@ -1230,7 +1230,7 @@ class Recorder():
 					                              pred_vel=real_vel_global_frame, dt=self.args.dt)
 
 					obsv_XY = sup.to_image_frame(Hinv, traj_real)*scale_factor
-					sup.line_cv(overlay, obsv_XY, (255, 0, 0), 3) # bgr convention
+					sup.line_cv(overlay, obsv_XY, (128, 128, 0), 3) # bgr convention
 
 					# Plot social trajectory
 					if social_trajectories:
@@ -1242,9 +1242,13 @@ class Recorder():
 							sup.line_cv(overlay, obsv_XY, (255, 0, 0), 3)  # bgr convention
 
 					# Plot real predicted traj from positions
-					#traj_real = traj.pose_vec[step:step+self.args.prev_horizon+self.args.prediction_horizon,:2]
-					#obsv_XY = sup.to_image_frame(Hinv, traj_real)*scale_factor
-					#sup.line_cv(overlay, obsv_XY, (0, 0, 0), 3)  # bgr convention
+					traj_real = traj.pose_vec[step+self.args.prev_horizon:step+self.args.prev_horizon+self.args.prediction_horizon,:2]
+					obsv_XY = sup.to_image_frame(Hinv, traj_real)*scale_factor
+					sup.line_cv(overlay, obsv_XY, (255, 0, 0), 3)  # bgr convention
+
+					traj_real = traj.pose_vec[step:,:2]
+					obsv_XY2 = sup.to_image_frame(Hinv, traj_real)*scale_factor
+					sup.line_cv(overlay, obsv_XY2, (0, 0, 0), 3)  # bgr convention
 
 					# Predicted trajectory
 					colors = [(0,0,255),(0,255,0),(0,255,255)]
