@@ -1220,8 +1220,8 @@ class Recorder():
 					for i in range(self.args.prediction_horizon):
 						idx = i * self.args.output_dim
 						idy = i * self.args.output_dim + 1
-						mu_x = gt_vel[step, idx] + input[step, 2]
-						mu_y = gt_vel[step, idy] + input[step, 3]
+						mu_x = gt_vel[step, idx]
+						mu_y = gt_vel[step, idy]
 						vel_real[i, :] = [mu_x, mu_y]
 
 					real_vel_global_frame = vel_real
