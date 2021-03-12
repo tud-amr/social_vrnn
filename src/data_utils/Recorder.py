@@ -1147,7 +1147,7 @@ class Recorder():
 		else:
 			"Video not found"
 
-	def plot_on_image(self,input_list,grid_list,y_pred_list_global,y_ground_truth_list,other_agents_list,traj_list,test_args,social_trajectories=None):
+	def plot_on_image(self,input_list,grid_list,y_pred_list_global,y_ground_truth_list,other_agents_list,traj_list,test_args,traj_likelihoods, social_trajectories=None):
 
 		#self.args.dt /= 10
 
@@ -1365,6 +1365,13 @@ class Recorder():
 							center = (int(obsv_XY[0, 1]*scale_factor), int(obsv_XY[0, 0]*scale_factor))
 							cv2.ellipse(overlay, center, (5, 5), 0, 0, 360, (153, 153, 51), -1)
 
+					traj_likelihood = traj_likelihoods[animation_idx]
+					likelihoods = traj_likelihood[step].flatten()
+					font = cv2.FONT_HERSHEY_SIMPLEX
+					cv2.putText(overlay, f"{likelihoods[0]:.2f}", (10, 25), font, 0.5, colors[0], 2)
+					cv2.putText(overlay, f"{likelihoods[1]:.2f}", (10, 50), font, 0.5, colors[1], 2)
+					cv2.putText(overlay, f"{likelihoods[2]:.2f}", (10, 75), font, 0.5, colors[2], 2)
+
 					# Adding legend
 					font = cv2.FONT_HERSHEY_SIMPLEX
 					cv2.line(overlay, (int(frame_height*scale_factor*0.9-50), 30), (int(frame_height*scale_factor*0.9-40), 30), (255, 0, 0), 4)
@@ -1375,7 +1382,7 @@ class Recorder():
 
 					cap.write(overlay)
 
-					#cv2.imwrite(self.args.model_path + '/results/' + self.args.scenario+"/figs/result_"+str(animation_idx)+"_"+str(step)+".jpg", overlay);
+					# cv2.imwrite(self.args.model_path + '/results/' + self.args.scenario+"/figs/result_"+str(animation_idx)+"_"+str(step)+".jpg", overlay);
 
 			# When everything done, release the video capture and video write objects
 			cap.release()

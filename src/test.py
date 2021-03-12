@@ -307,7 +307,7 @@ if test_args.record:
 	if ("real_world" in test_args.scenario) and not test_args.unit_testing:
 		print("Real data!!")
 		recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list,
-			                       trajectories,test_args)
+			                       trajectories,test_args, all_traj_likelihood)
 		# recorder.plot_on_video(input_list, grid_list, all_predictions, y_ground_truth_list,
 		#                        other_agents_list,
 		#                        trajectories, all_traj_likelihood, test_args)
