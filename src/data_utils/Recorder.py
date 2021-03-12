@@ -1230,7 +1230,7 @@ class Recorder():
 					                              pred_vel=real_vel_global_frame, dt=self.args.dt)
 
 					obsv_XY = sup.to_image_frame(Hinv, traj_real)*scale_factor
-					sup.line_cv(overlay, obsv_XY, (128, 128, 0), 3) # bgr convention
+					sup.line_cv(overlay, obsv_XY, (255, 0, 0), 3) # bgr convention
 
 					# Plot social trajectory
 					if social_trajectories:
@@ -1244,16 +1244,15 @@ class Recorder():
 					# Plot real predicted traj from positions
 					traj_real = traj.pose_vec[step+self.args.prev_horizon:step+self.args.prev_horizon+self.args.prediction_horizon,:2]
 					obsv_XY = sup.to_image_frame(Hinv, traj_real)*scale_factor
-					sup.line_cv(overlay, obsv_XY, (255, 0, 0), 3)  # bgr convention
+					if False: sup.line_cv(overlay, obsv_XY, (128, 128, 0), 3)  # bgr convention
 
 					traj_real = traj.pose_vec[step:,:2]
 					obsv_XY2 = sup.to_image_frame(Hinv, traj_real)*scale_factor
 					obsv_XY3 = obsv_XY2[self.args.prev_horizon:self.args.prev_horizon+self.args.prediction_horizon]
 					delta = obsv_XY - obsv_XY3
 
-					if np.max(np.abs(delta))>0:
-						print("problem")
-					sup.line_cv(overlay, obsv_XY2, (0, 0, 0), 3)  # bgr convention
+					if np.max(np.abs(delta))>0: print("problem")
+					if False: sup.line_cv(overlay, obsv_XY2, (0, 0, 0), 3)  # bgr convention
 
 					# Predicted trajectory
 					colors = [(0,0,255),(0,255,0),(0,255,255)]
@@ -1301,8 +1300,8 @@ class Recorder():
 											mu_x = prediction_sample[0, idx] / self.args.sx_vel + self.args.min_vel_x
 											mu_y = prediction_sample[0, idx + self.args.n_mixtures] / self.args.sy_vel + self.args.min_vel_y
 										else:
-											mu_x = prediction_sample[0, idx] + input[step, 2]
-											mu_y = prediction_sample[0, idx + self.args.n_mixtures] + input[step, 3]
+											mu_x = prediction_sample[0, idx]
+											mu_y = prediction_sample[0, idx + self.args.n_mixtures]
 										if self.args.output_pred_state_dim > 2:
 											sigmax[pred_step, :] = prediction_sample[0][idx + 2 * self.args.n_mixtures]
 											sigmay[pred_step, :] = prediction_sample[0][idx + 3 * self.args.n_mixtures]
