@@ -223,6 +223,21 @@ def to_image_frame(Hinv, loc):
     locXYZ = locHomogenous / locHomogenous[2]  # to pixels (from millimeters)
     return locXYZ[:2].astype(int)
 
+def to_image_frame_float(Hinv, loc):
+  """
+	Given H^-1 and world coordinates, returns (u, v) in image coordinates.
+	"""
+  locHomogenous = np.hstack((loc, np.ones((loc.shape[0], 1))))
+  if locHomogenous.ndim > 1:
+    loc_tr = np.transpose(locHomogenous)
+    loc_tr = np.matmul(Hinv, loc_tr)  # to camera frame
+    locXYZ = np.transpose(loc_tr / loc_tr[2])  # to pixels (from millimeters)
+    return locXYZ[:, :2]
+  else:
+    locHomogenous = np.dot(Hinv, locHomogenous)  # to camera frame
+    locXYZ = locHomogenous / locHomogenous[2]  # to pixels (from millimeters)
+    return locXYZ[:2]
+
 def to_pos_frame(Hinv, loc):
   """
 	Given H^-1 and world coordinates, returns (u, v) in image coordinates.
