@@ -310,9 +310,11 @@ if test_args.record:
 		# recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list, trajectories,test_args)
 		plotargs = (input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list, trajectories, test_args)
 		Plotter.generate_zoom_plot(recorder.args, *plotargs)
-		recorder.plot_on_video(input_list, grid_list, all_predictions, y_ground_truth_list,
-		                       other_agents_list,
-		                       trajectories, all_traj_likelihood, test_args)
+		recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list,
+			                       trajectories,test_args, all_traj_likelihood)
+		# recorder.plot_on_video(input_list, grid_list, all_predictions, y_ground_truth_list,
+		#                        other_agents_list,
+		#                        trajectories, all_traj_likelihood, test_args)
 	else:
 		# recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list,
 		#	                       trajectories,test_args)
