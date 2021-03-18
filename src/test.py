@@ -1,7 +1,11 @@
 import sys
 import os
 
+
+
 sys.path.append('../')
+
+from src.data_utils.Plotter import Plotter
 import numpy as np
 import argparse
 import pylab as pl
@@ -306,9 +310,15 @@ if test_args.record:
 	recorder = rec(args, data_prep.agent_container.occupancy_grid)
 	if ("real_world" in test_args.scenario) and not test_args.unit_testing:
 		print("Real data!!")
-		recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list,
-			                       trajectories,test_args)
-		# recorder.plot_on_video(input_list, grid_list, all_predictions, y_ground_truth_list,
+		# recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list,
+		# 	                       trajectories,test_args)
+		plotargs = (input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list, trajectories,
+		test_args)
+		Plotter.generate_zoom_plot(recorder.args, *plotargs)
+		# recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list,
+		# 					   other_agents_list,
+		# 					   trajectories, test_args, all_traj_likelihood)
+			# recorder.plot_on_video(input_list, grid_list, all_predictions, y_ground_truth_list,
 		#                        other_agents_list,
 		#                        trajectories, all_traj_likelihood, test_args)
 	else:
