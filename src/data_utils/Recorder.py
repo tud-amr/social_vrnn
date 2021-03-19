@@ -1300,8 +1300,8 @@ class Recorder():
 											mu_x = prediction_sample[0, idx] / self.args.sx_vel + self.args.min_vel_x
 											mu_y = prediction_sample[0, idx + self.args.n_mixtures] / self.args.sy_vel + self.args.min_vel_y
 										else:
-											mu_x = prediction_sample[0, idx] + input[step, 2]
-											mu_y = prediction_sample[0, idx + self.args.n_mixtures] + input[step, 3]
+											mu_x = prediction_sample[0, idx]
+											mu_y = prediction_sample[0, idx + self.args.n_mixtures]
 										if self.args.output_pred_state_dim > 2:
 											sigmax[pred_step, :] = prediction_sample[0][idx + 2 * self.args.n_mixtures]
 											sigmay[pred_step, :] = prediction_sample[0][idx + 3 * self.args.n_mixtures]
