@@ -309,9 +309,11 @@ if test_args.record:
 		print("Real data!!")
 		# recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list, trajectories,test_args)
 		plotargs = (input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list, trajectories, test_args)
-		Plotter.generate_zoom_plot(recorder.args, *plotargs)
-		recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list,
+		try: Plotter.generate_zoom_plot(recorder.args, *plotargs, all_traj_likelihood)
+		except: pass
+		try: recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list,
 			                       trajectories,test_args, all_traj_likelihood)
+		except: pass
 		# recorder.plot_on_video(input_list, grid_list, all_predictions, y_ground_truth_list,
 		#                        other_agents_list,
 		#                        trajectories, all_traj_likelihood, test_args)

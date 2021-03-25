@@ -11,7 +11,7 @@ import math
 class Plotter:
 
 	@staticmethod
-	def generate_zoom_plot(cmdargs, input_list, grid_list, y_pred_list_global, y_ground_truth_list, other_agents_list, traj_list, test_args, social_trajectories=None):
+	def generate_zoom_plot(cmdargs, input_list, grid_list, y_pred_list_global, y_ground_truth_list, other_agents_list, traj_list, test_args, traj_likelihoods, social_trajectories=None):
 
 		scale_factor = 8
 		context_scalar = 1.5
@@ -19,6 +19,7 @@ class Plotter:
 		# Relevant file paths
 		scenario = cmdargs.scenario.split('/')[-1]
 		video_file = cmdargs.model_path + '/../videos/'+ scenario + str(cmdargs.exp_num) + "_zoom.avi"
+		print(video_file)
 		map_file = cmdargs.data_path + cmdargs.scenario + '/map.png'
 		homography_file = os.path.join(cmdargs.data_path + cmdargs.scenario, 'H.txt')
 		if not os.path.exists(map_file): print("No map file found"); exit()
@@ -264,8 +265,16 @@ class Plotter:
 				# print(cmdargs.submap_width * cmdargs.submap_resolution)
 				center = obsvs_XY[0]
 
-				
-				cap.write(overlay[int(obsvs_XY[0][0] - 0.5*submap_size):int(obsvs_XY[0][0] + 0.5*submap_size), int(obsvs_XY[0][1] - 0.5*submap_size):int(obsvs_XY[0][1] + 0.5*submap_size)])
+				framething = overlay[int(obsvs_XY[0][0] - 0.5 * submap_size):int(obsvs_XY[0][0] + 0.5 * submap_size), int(obsvs_XY[0][1] - 0.5 * submap_size):int(obsvs_XY[0][1] + 0.5 * submap_size)]
+
+				traj_likelihood = traj_likelihoods[animation_idx]
+				likelihoods = traj_likelihood[step].flatten()
+				font = cv2.FONT_HERSHEY_SIMPLEX
+				cv2.putText(framething, f"{likelihoods[0]:.2f}", (10, 25), font, 0.5, colors[0], 2)
+				cv2.putText(framething, f"{likelihoods[1]:.2f}", (10, 50), font, 0.5, colors[1], 2)
+				cv2.putText(framething, f"{likelihoods[2]:.2f}", (10, 75), font, 0.5, colors[2], 2)
+
+				cap.write(framething)
 
 				#cv2.imwrite(cmdargs.model_path + '/results/' + cmdargs.scenario+"/figs/result_"+str(animation_idx)+"_"+str(step)+".jpg", overlay);
 
