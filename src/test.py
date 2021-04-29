@@ -35,6 +35,7 @@ else:
 	from src.data_utils.Performance import *
 	from src.data_utils.utils import *
 	from src.data_utils.Recorder import Recorder as rec
+	from src.data_utils.Plotter import Plotter
 
 # Model directories
 def parse_args():
@@ -306,8 +307,13 @@ if test_args.record:
 	recorder = rec(args, data_prep.agent_container.occupancy_grid)
 	if ("real_world" in test_args.scenario) and not test_args.unit_testing:
 		print("Real data!!")
-		recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list,
+		# recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list, trajectories,test_args)
+		plotargs = (input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list, trajectories, test_args)
+		try: Plotter.generate_zoom_plot(recorder.args, *plotargs, all_traj_likelihood)
+		except: pass
+		try: recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list,
 			                       trajectories,test_args, all_traj_likelihood)
+		except: pass
 		# recorder.plot_on_video(input_list, grid_list, all_predictions, y_ground_truth_list,
 		#                        other_agents_list,
 		#                        trajectories, all_traj_likelihood, test_args)
