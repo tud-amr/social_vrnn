@@ -42,7 +42,7 @@ class Plotter:
 		frame_height, frame_width, layers = im.shape
 		resized_img = cv2.resize(im, (frame_width * scale_factor, frame_height * scale_factor), interpolation=cv2.INTER_AREA)
 
-		cap = cv2.VideoWriter(video_file, cv2.VideoWriter_fourcc('M', 'P', '4', '2'), 5,
+		cap = cv2.VideoWriter(video_file, cv2.VideoWriter_fourcc('M', 'P', '4', '2'), 25,
 										(submap_size, submap_size))
 
 		vel_real = np.zeros((cmdargs.prediction_horizon,  cmdargs.output_dim))
