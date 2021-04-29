@@ -330,7 +330,7 @@ class NetworkModel():
             self.total_loss = tf.reduce_mean(loss_list, axis=0)+(tf.reduce_mean(kl_loss_list, axis=0))*self.beta
             self.reconstruction_loss = tf.reduce_mean(loss_list, axis=0)
             self.kl_loss = tf.reduce_mean(kl_loss_list, axis=0)
-            self.likelihood_loss = tf.stop_gradient(tf.reduce_mean(likelihood_loss_list, axis=0))
+            self.likelihood_loss = tf.stop_gradient(likelihood_loss_list[-1])
 
             # Optimizer specification
             # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
