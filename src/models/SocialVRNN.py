@@ -256,7 +256,7 @@ class NetworkModel():
                     muy = tf.split(dec_muy, self.prediction_horizon, axis=1)
                     sigmax = tf.exp(tf.split(dec_sigmax, self.prediction_horizon, axis=1))
                     sigmay = tf.exp(tf.split(dec_sigmay, self.prediction_horizon, axis=1))
-                    pi = tf.nn.softmax(dec_pi, axis=1)  # shape = [batch size, n_mixtures]
+                    pi = tf.stop_gradient(tf.nn.softmax(dec_pi, axis=1))  # shape = [batch size, n_mixtures]
 
                     self.likelihood.append(pi)
                     pred = []
