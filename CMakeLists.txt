@@ -6,6 +6,20 @@ find_package(
    # Specify dependencies
    COMPONENTS
    rospy
+   message_generation
+   geometry_msgs
+   nav_msgs
+)
+
+add_message_files(
+   FILES
+   lmpcc_obstacle.msg
+   lmpcc_obstacle_array.msg
+)
+
+generate_messages(
+   DEPENDENCIES
+   geometry_msgs
    nav_msgs
 )
 
@@ -13,6 +27,8 @@ catkin_package(
    # Specify package dependencies
    CATKIN_DEPENDS
    rospy
+   message_runtime
+   geometry_msgs
    nav_msgs
 )
 
