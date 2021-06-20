@@ -1367,9 +1367,9 @@ class Recorder():
 					traj_likelihood = traj_likelihoods[animation_idx]
 					likelihoods = traj_likelihood[step].flatten()
 					font = cv2.FONT_HERSHEY_SIMPLEX
-					cv2.putText(overlay, f"{likelihoods[0]:.2f}", (10, 25), font, 0.5, colors[0], 2)
-					cv2.putText(overlay, f"{likelihoods[1]:.2f}", (10, 50), font, 0.5, colors[1], 2)
-					cv2.putText(overlay, f"{likelihoods[2]:.2f}", (10, 75), font, 0.5, colors[2], 2)
+					# cv2.putText(overlay, f"{likelihoods[0]:.2f}", (10, 25), font, 0.5, colors[0], 2)
+					# cv2.putText(overlay, f"{likelihoods[1]:.2f}", (10, 50), font, 0.5, colors[1], 2)
+					# cv2.putText(overlay, f"{likelihoods[2]:.2f}", (10, 75), font, 0.5, colors[2], 2)
 
 					# Adding legend
 					font = cv2.FONT_HERSHEY_SIMPLEX

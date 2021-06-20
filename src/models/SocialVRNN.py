@@ -3,8 +3,8 @@ import sys
 
 if sys.version_info[0] < 3:
     sys.path.append('../src/external')
-    from vrnn_cell import VariationalRNNCell as vrnn_cell
-    from tf_utils import *
+    from cells.vrnn_cell import VariationalRNNCell as vrnn_cell
+    from models.tf_utils import *
 else:
     from src.cells.vrnn_cell import VariationalRNNCell as vrnn_cell
     from src.models.tf_utils import *
