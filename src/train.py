@@ -348,7 +348,11 @@ map_args = {"file_name": 'map.png',
 data_prep.processData(**map_args)
 
 # Import Deep Learning model
-module = importlib.import_module("src.models." + args.model_name)
+
+if sys.version_info[0] < 3:
+	module = importlib.import_module("models." + args.model_name)
+else:
+	module = importlib.import_module("src.models." + args.model_name)
 globals().update(module.__dict__)
 
 # Create Model Graph
