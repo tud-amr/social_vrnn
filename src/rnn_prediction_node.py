@@ -32,7 +32,7 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as pl
 from scipy.stats import multivariate_normal
-from social_vrnn_node.msg import lmpcc_obstacle, lmpcc_obstacle_array
+from social_vrnn.msg import lmpcc_obstacle, lmpcc_obstacle_array
 
 import pickle as pkl
 import threading as th
@@ -149,7 +149,7 @@ class SocialVDGNN:
 	def load_args(self):
 		cwd = os.getcwd()
 		
-		model_path = os.path.join(rospkg.RosPack().get_path('social_vrnn_node'), 'trained_models', self.model_name, str(self.model_id))
+		model_path = os.path.join(rospkg.RosPack().get_path('social_vrnn'), 'trained_models', self.model_name, str(self.model_id))
 		
 		print("Loading data from: '{}'".format(model_path))
 		file = open(model_path + '/model_parameters.pkl', 'rb')

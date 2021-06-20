@@ -3,11 +3,22 @@
 import os
 import sys
 import time
+import pickle
 import numpy as np
 
+import tensorflow as tf
+from models.SocialVRNN import NetworkModel as SocialVRNN
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+import rospkg
 import rospy
 from nav_msgs.msg import OccupancyGrid, Odometry
 from social_vrnn.msg import lmpcc_obstacle_array as LMPCC_Obstacle_Array
+
+PACKAGE_NAME = 'social_vrnn'
+TRAIN_RUN = '500'
+QUERY_AGENTS = 3
 
 
 class SocialVRNN_Predictor:
@@ -16,23 +27,45 @@ class SocialVRNN_Predictor:
    > see https://github.com/tud-amr/social_vrnn/tree/roboat-vrnn-vessel
    """
 
-   def __init__(self, node_name, visual_node_name, args):
+   def __init__(self, node_name, visual_node_name):
       self._node_name = node_name
       self._visual_node_name = visual_node_name
-      self._args = args
-
-      # Class variables
-      self._occupancy_grid = None
 
       # Bind node
       rospy.init_node(self._node_name)
       rospy.on_shutdown(self._shutdown_callback)
       rospy.loginfo('{} has started.'.format(self._visual_node_name))
 
+      # Set up class variables
+      trained_models_dir = os.path.join(rospkg.RosPack().get_path(PACKAGE_NAME), 'trained_models')
+      self._model, self.tf_session = self._load_model('SocialVRNN', SocialVRNN, trained_models_dir)
+      self._occupancy_grid = None
+
       # Set up subscribers
       rospy.Subscriber('/roboat_cloud/obstacle/map', OccupancyGrid, self._store_occupancy_grid)
       rospy.Subscriber('/ellipse_objects_feed', LMPCC_Obstacle_Array, self._store_world_state)
       rospy.Subscriber('/roboat_localization/odometry_ekf/odometry_filtered', Odometry, self._store_roboat_state)
+
+   def _load_model(self, model_name, model_class, trained_dir):
+      # Load model arguments
+      model_dir = os.path.join(trained_dir, model_name, TRAIN_RUN)
+      convnet_dir = os.path.join(trained_dir, 'autoencoder_with_ped')
+      with open(os.path.join(model_dir, 'model_parameters.pkl'), 'rb') as f:
+         model_args = pickle.load(f)["args"]
+      model_args.model_path = model_dir
+      model_args.pretrained_convnet_path = convnet_dir
+      model_args.batch_size = QUERY_AGENTS
+      model_args.truncated_backprop_length = 1 # why?
+      model_args.keep_prob = 1.0
+
+      # Load model
+      model = model_class(model_args)
+      tf_session = tf.Session()
+      model.warmstart_model(model_args, tf_session)
+      try: model.warmstart_convnet(model_args, tf_session)
+      except: rospy.logwarn("Could not warm-start ConvNet")
+      rospy.loginfo("Model loaded!")
+      return model, tf_session
 
    def _store_occupancy_grid(self, occupancy_grid_msg):
       if self._occupancy_grid is not None: return
@@ -50,10 +83,12 @@ class SocialVRNN_Predictor:
       rospy.loginfo('Saved occupancy grid.')
       
    def _store_world_state(self, world_state_msg):
-      rospy.loginfo('Received world state.')
+      # rospy.loginfo('Received world state.')
+      pass
 
    def _store_roboat_state(self, roboat_state_msg):
-      rospy.loginfo('Received roboat state.')
+      # rospy.loginfo('Received roboat state.')
+      pass
    
    def _shutdown_callback(self):
       rospy.loginfo('{} was terminated.'.format(self._visual_node_name))
@@ -65,7 +100,7 @@ if __name__ == '__main__':
    args = rospy.myargv(sys.argv)
 
    # Start main logic
-   SocialVRNN_Predictor('roboat_ros_node', 'Social-VRNN roboat node', args)
+   SocialVRNN_Predictor('roboat_ros_node', 'Social-VRNN roboat node')
 
    # Keep node alive until shutdown
    rate = rospy.Rate(10)
