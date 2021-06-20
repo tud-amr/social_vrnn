@@ -348,9 +348,9 @@ class NetworkModel():
             # Apply gradients to update model
             self.update = self.optimizer.apply_gradients(zip(self.grads, train_vars),
                                                          global_step=global_step)
-            self.likelihood_update = self.optimizer.apply_gradients(
-                zip(self.likelihood_grads, train_vars),
-                global_step=global_step)
+            # self.likelihood_update = self.optimizer.apply_gradients(
+            #     zip(self.likelihood_grads, train_vars),
+            #     global_step=global_step)
             # self.update = self.optimizer.minimize(self.total_loss, global_step=global_step)
             # Tensorboard summary
 
@@ -551,11 +551,10 @@ class NetworkModel():
             # Assemble feed dict for training
             feed_dict_train[self.diversity_placeholder] = batch_y_varible
 
-        _, _, batch_loss, kl_loss, recons_loss, lh_loss, _current_state, _current_state_lstm_grid, _current_state_lstm_ped, \
+        _, batch_loss, kl_loss, recons_loss, lh_loss, _current_state, _current_state_lstm_grid, _current_state_lstm_ped, \
         _current_state_lstm_concat, \
         _model_prediction, _summary_str, lr, beta, output_decoder, div_loss, autoencoder_loss = sess.run(
             [self.update,
-             self.likelihood_update,
              self.total_loss,
              self.kl_loss,
              self.reconstruction_loss,
