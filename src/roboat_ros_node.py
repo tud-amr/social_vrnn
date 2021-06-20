@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import pickle
+import cv2
 import numpy as np
 
 import tensorflow as tf
@@ -17,7 +18,6 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 from social_vrnn.msg import lmpcc_obstacle_array as LMPCC_Obstacle_Array
 
 PACKAGE_NAME = 'social_vrnn'
-TRAIN_RUN = '500'
 QUERY_AGENTS = 3
 
 
@@ -37,8 +37,8 @@ class SocialVRNN_Predictor:
       rospy.loginfo('{} has started.'.format(self._visual_node_name))
 
       # Set up class variables
-      trained_models_dir = os.path.join(rospkg.RosPack().get_path(PACKAGE_NAME), 'trained_models')
-      self._model, self.tf_session = self._load_model('SocialVRNN', SocialVRNN, trained_models_dir)
+      self._set_model_args('SocialVRNN', '500')
+      # self._model, self.tf_session = self._load_model(SocialVRNN, self._model_args)
       self._occupancy_grid = None
 
       # Set up subscribers
@@ -46,19 +46,19 @@ class SocialVRNN_Predictor:
       rospy.Subscriber('/ellipse_objects_feed', LMPCC_Obstacle_Array, self._store_world_state)
       rospy.Subscriber('/roboat_localization/odometry_ekf/odometry_filtered', Odometry, self._store_roboat_state)
 
-   def _load_model(self, model_name, model_class, trained_dir):
-      # Load model arguments
-      model_dir = os.path.join(trained_dir, model_name, TRAIN_RUN)
+   def _set_model_args(self, model_name, train_run):
+      trained_dir = os.path.join(rospkg.RosPack().get_path(PACKAGE_NAME), 'trained_models')
+      model_dir = os.path.join(trained_dir, model_name, train_run)
       convnet_dir = os.path.join(trained_dir, 'autoencoder_with_ped')
       with open(os.path.join(model_dir, 'model_parameters.pkl'), 'rb') as f:
-         model_args = pickle.load(f)["args"]
-      model_args.model_path = model_dir
-      model_args.pretrained_convnet_path = convnet_dir
-      model_args.batch_size = QUERY_AGENTS
-      model_args.truncated_backprop_length = 1 # why?
-      model_args.keep_prob = 1.0
+         self._model_args = pickle.load(f)["args"]
+      self._model_args.model_path = model_dir
+      self._model_args.pretrained_convnet_path = convnet_dir
+      self._model_args.batch_size = QUERY_AGENTS
+      self._model_args.truncated_backprop_length = 1 # why?
+      self._model_args.keep_prob = 1.0 # why?
 
-      # Load model
+   def _load_model(self, model_class, model_args):
       model = model_class(model_args)
       tf_session = tf.Session()
       model.warmstart_model(model_args, tf_session)
@@ -68,18 +68,49 @@ class SocialVRNN_Predictor:
       return model, tf_session
 
    def _store_occupancy_grid(self, occupancy_grid_msg):
-      if self._occupancy_grid is not None: return
-      # rospy.loginfo('m/cell: {}, width: {}, height: {}'.format(occupancy_grid_msg.info.resolution, occupancy_grid_msg.info.width, occupancy_grid_msg.info.height))
-      # rospy.loginfo('Origin at x: {}, y: {}'.format(occupancy_grid_msg.info.origin.position.x, occupancy_grid_msg.info.origin.position.y))
-      # rospy.loginfo('Data length: {}, type: {}'.format(len(occupancy_grid_msg.data), (occupancy_grid_msg.data[0])))
-      
+      # Makes 1 pixel equal to 1 submap pixel
+      scale_factor = occupancy_grid_msg.info.resolution / self._model_args.submap_resolution
+
       # Transform occupancy grid data into Social-VRNN format
       grid_info = occupancy_grid_msg.info
       self._occupancy_grid = np.asarray(occupancy_grid_msg.data, dtype=float).reshape((grid_info.height, grid_info.width))
       self._occupancy_grid[self._occupancy_grid > 0.0] = 1.0
       self._occupancy_grid[self._occupancy_grid < 1.0] = 0.0
-      # TODO: transform to correct resolution?
+      self._occupancy_grid = cv2.flip(self._occupancy_grid, 0)
+      self._occupancy_grid = cv2.resize(
+         self._occupancy_grid,
+         (int(scale_factor * grid_info.width), int(scale_factor * grid_info.height)),
+         fx=0, fy=0,
+         interpolation=cv2.INTER_NEAREST
+      )
 
+      # Create custom function for requesting submap
+      def get_submap(origin_offset):
+         """
+         origin_offset: (2,) numpy matrix
+            The offset of the position in meters from the origin
+            Index 0 is x, index 1 is y
+         """
+         # Translate to pixel coordinates
+         origin_offset = origin_offset.copy().astype(float)
+         origin_offset /= self._model_args.submap_resolution
+         origin_offset[0] = origin_offset[0] + self._occupancy_grid.shape[1]/2
+         origin_offset[1] = self._occupancy_grid.shape[0]/2 - origin_offset[1]
+         
+         # Do bounds-check
+         if (origin_offset[0] < self._model_args.submap_width/2 or
+             origin_offset[0] > self._occupancy_grid.shape[1] - self._model_args.submap_width/2 or
+             origin_offset[1] < self._model_args.submap_height/2 or
+             origin_offset[1] > self._occupancy_grid.shape[0] - self._model_args.submap_height/2):
+            rospy.logerr("Out-of-bounds submap requested!")
+            return np.zeros((self._model_args.submap_height, self._model_args.submap_width), dtype=float)
+         
+         # Return submap
+         return self._occupancy_grid[
+            int(origin_offset[1]-self._model_args.submap_height/2) : int(origin_offset[1]+self._model_args.submap_height/2),
+            int(origin_offset[0]-self._model_args.submap_width/2) : int(origin_offset[0]+self._model_args.submap_width/2)
+         ]
+      self._get_submap = get_submap
       rospy.loginfo('Saved occupancy grid.')
       
    def _store_world_state(self, world_state_msg):

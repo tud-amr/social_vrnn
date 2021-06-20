@@ -5,6 +5,7 @@ social_vrnn
 dist
 social_vrnn.egg-info
 *.csv
+local/
 
 .vscode/
 .idea
