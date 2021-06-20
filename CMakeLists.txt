@@ -7,6 +7,7 @@ find_package(
    COMPONENTS
    rospy
    message_generation
+   visualization_msgs
    geometry_msgs
    nav_msgs
 )
@@ -28,6 +29,7 @@ catkin_package(
    CATKIN_DEPENDS
    rospy
    message_runtime
+   visualization_msgs
    geometry_msgs
    nav_msgs
 )
