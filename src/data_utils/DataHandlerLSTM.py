@@ -556,7 +556,7 @@ class DataHandlerLSTM():
 		# Dynamically set occupancy grid size
 		og_x_size = (br_rw-tl_rw)[0, 0]
 		og_y_size = (tl_rw-br_rw)[1, 0]
-		self.agent_container.occupancy_grid.map_size = np.array([og_x_size, og_y_size])  # map size in meters, [0] = x (>), [1] = y (^)
+		self.agent_container.occupancy_grid.map_size = np.array([og_x_size, og_y_size])  # map size in meters, [0] = x (→), [1] = y (↑)
 		self.agent_container.occupancy_grid.center = self.agent_container.occupancy_grid.map_size / 2.0
 
 		gridmap_us = cv2.resize(
