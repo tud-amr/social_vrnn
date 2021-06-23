@@ -256,7 +256,7 @@ class NetworkModel():
                     muy = tf.split(dec_muy, self.prediction_horizon, axis=1)
                     sigmax = tf.exp(tf.split(dec_sigmax, self.prediction_horizon, axis=1))
                     sigmay = tf.exp(tf.split(dec_sigmay, self.prediction_horizon, axis=1))
-                    pi = tf.nn.softmax(dec_pi, axis=1) # shape = [batch size, n_mixtures]
+                    pi = tf.nn.softmax(dec_pi, axis=1)  # shape = [batch size, n_mixtures]
 
                     self.likelihood.append(pi)
                     pred = []
@@ -330,7 +330,7 @@ class NetworkModel():
             self.total_loss = tf.reduce_mean(loss_list, axis=0)+(tf.reduce_mean(kl_loss_list, axis=0))*self.beta
             self.reconstruction_loss = tf.reduce_mean(loss_list, axis=0)
             self.kl_loss = tf.reduce_mean(kl_loss_list, axis=0)
-            self.likelihood_loss = tf.stop_gradient(likelihood_loss_list[-1])
+            self.likelihood_loss = tf.reduce_mean(likelihood_loss_list, axis=0)
 
             # Optimizer specification
             # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
