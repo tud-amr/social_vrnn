@@ -127,7 +127,7 @@ class SocialVRNN_Predictor:
             padded_og,
             cv2.getRotationMatrix2D(
                (padded_og.shape[1]/2, padded_og.shape[0]/2),
-               -np.rad2deg(math.atan2(orientation[1], orientation[0])) + 90,
+               -np.rad2deg(math.atan2(orientation[1], orientation[0])),
                1.0
             ),
             (padded_og.shape[1], padded_og.shape[0]),
