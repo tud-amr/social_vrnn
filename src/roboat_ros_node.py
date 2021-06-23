@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
+import sys; print("Running with {}".format(sys.version))
 import os
-import sys
 import time
 import pickle
 import cv2
@@ -38,7 +38,7 @@ class SocialVRNN_Predictor:
 
       # Set up class variables
       self._set_model_args('SocialVRNN', '500')
-      # self._model, self.tf_session = self._load_model(SocialVRNN, self._model_args)
+      self._model, self.tf_session = self._load_model(SocialVRNN, self._model_args)
       self._occupancy_grid = None
 
       # Set up subscribers

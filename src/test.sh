@@ -1,1 +1,1 @@
-python3 test.py --exp_num 501 --model_name SocialVRNN --num_test_sequences 10 --scenario real_world/amsterdam_canals --record true
+python3 test.py --exp_num 500 --model_name SocialVRNN --num_test_sequences 10 --scenario real_world/amsterdam_canals --record true
