@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from operator import pos
 import sys; print("Running with {}".format(sys.version))
 import os
 import copy
@@ -49,7 +50,7 @@ class SocialVRNN_Predictor:
 
       # Load the model
       self.model_args = self._get_model_args('SocialVRNN', '500')
-      # self._model, self.tf_session = self._load_model(SocialVRNN, self.model_args)
+      self.model, self.tf_session = self._load_model(SocialVRNN, self.model_args)
 
       # Set up subscribers
       rospy.Subscriber('/roboat_cloud/obstacle/map', OccupancyGrid, self._store_occupancy_grid)
@@ -95,6 +96,11 @@ class SocialVRNN_Predictor:
                   continue
                velocities_tl[ag_ind + 1][2*tl_ind:2*(tl_ind+1)] = self._agents_vel_ls[tl_ind][ord_agents_ind[ag_ind]]
 
+      # Get the submaps
+      submaps = np.zeros((len(positions_ct), self.model_args.submap_width, self.model_args.submap_height), dtype=float)
+      for id in range(len(positions_ct)):
+         submaps[id] = np.transpose(self._get_submap(positions_ct[id], velocities_tl[id][:2]))
+
       # Calculate the relative odometry
       relative_odometry = np.zeros((len(positions_ct), len(positions_ct) * 4), dtype=float)
       for sub_id in range(len(positions_ct)):
@@ -114,6 +120,20 @@ class SocialVRNN_Predictor:
 
             # Set respective field
             relative_odometry[sub_id][4*obj_id:4*(obj_id+1)] = np.concatenate((obj_pos, obj_vel))
+
+      return self.model.predict(
+         self.tf_session,
+         self.model.feed_test_dic(
+            batch_vel = velocities_tl,
+            batch_initial_vel = velocities_tl[:, :2],
+            batch_pos = positions_ct,
+            batch_initial_uncertainty = 0.2 * np.ones_like(positions_ct),
+            batch_ped_grid = relative_odometry,
+            batch_grid = submaps,
+            step = 0
+         ),
+         True
+      )
 
 
    def publish(self, predictions):
@@ -165,8 +185,11 @@ class SocialVRNN_Predictor:
       # Create custom function for requesting submap
       def get_submap(position, orientation):
          """
-         origin_offset: (2,) numpy matrix
+         position: (2,) numpy matrix
             The offset of the position in meters from the origin
+            Index 0 is x, index 1 is y
+         orientation: (2,) numpy matrix
+            The orientation of the position (does not have to be normalised)
             Index 0 is x, index 1 is y
          """
          # Translate to pixel coordinates
