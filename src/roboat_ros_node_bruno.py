@@ -1,58 +1,73 @@
-#!/usr/bin/env python
+import sys
 import time
+import rospy
+import rospkg
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+import cv2
+sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+from geometry_msgs.msg import Pose, PoseStamped
+from pedsim_msgs.msg import TrackedPersons, TrackedPerson
+from nav_msgs.msg import Path, OccupancyGrid, Odometry
+from nav_msgs.srv import GetMap
+from visualization_msgs.msg import MarkerArray, Marker
+from derived_object_msgs.msg import ObjectArray
+
+import PIL
 import os
+import imutils
+
+
+import math
+
+print('Python %s on %s' % (sys.version, sys.platform))
+print(os.getcwd())
+sys.path.extend([os.getcwd()+'/data_utils'])
+sys.path.extend([os.getcwd()+'/models'])
+
+if sys.version_info[0] < 3:
+	print("Using Python " + str(sys.version_info[0]))
+	import Support as sup
+else:
+	print("Using Python " + str(sys.version_info[0]))
+	from data_utils import Support as sup
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as pl
+from scipy.stats import multivariate_normal
+from lmpcc_msgs.msg import lmpcc_obstacle, lmpcc_obstacle_array, lmpcc_predict_point, lmpcc_predict_path
+
 import pickle as pkl
 import threading as th
 import importlib
-import math
-import numpy as np
-import matplotlib.pyplot as pl
-
-import sys; print('Python %s on %s' % (sys.version, sys.platform))
-path_1 = os.path.join(os.getcwd(), "data_utils")
-if os.path.exists(path_1) and os.path.isdir(path_1):
-	sys.path.append(path_1)
-	print('Data utils added to path')
-
-path_2 = os.path.join(os.getcwd(), "models")
-if os.path.exists(path_2) and os.path.isdir(path_2):
-	sys.path.append(path_2)
-	print('Models added to path')
-
-import rospy
-from geometry_msgs.msg import Pose, PoseStamped
-# from pedsim_msgs.msg import TrackedPersons, TrackedPerson
-from nav_msgs.msg import Path, OccupancyGrid
-from visualization_msgs.msg import MarkerArray, Marker
-
-from data_utils import DataHandlerLSTM as dhlstm
-
-from data_utils import Support as sup
-from lmpcc_msgs.msg import lmpcc_obstacle, lmpcc_obstacle_array
-
 os.environ['TF_ENABLE_AUTO_MIXED_PRECISION'] = '1'
-import tensorflow as tf
-
-model_name = "IntNet"
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 # Import model
-from IntNet import NetworkModel
+from VRNNwLikelihood import NetworkModel
+
+
+# from VDGNN_simple import NetworkModel
 
 class SocialVDGNN:
 	def __init__(self):
 
 		self.model_name = rospy.get_param('~model_name', 'VRNNwLikelihood')
-		self.model_id = rospy.get_param('~id', '46')
+		self.model_id = rospy.get_param('~id', '4')
 		# ROS Topics
-		self.other_agents_topic = rospy.get_param('~other_agents_topic',"/pedsim_visualizer/tracked_persons")
-		self.robot_state_topic = rospy.get_param('~robot_state_topic', "/robot_state")
-		self.grid_topic = rospy.get_param('~grid_topic',"/move_base/local_costmap/costmap")
+		self.other_agents_topic = rospy.get_param('~other_agents_topic', "/carla/objects")
+		self.robot_state_topic = rospy.get_param('~robot_state_topic', "/carla/ego_vehicle/odometry")
+		self.grid_topic = rospy.get_param('~grid_topic', "/move_base/local_costmap/costmap")
 		self.robot_plan_topic = rospy.get_param('~robot_plan_topic', "/predicted_trajectory")
+		self.reset_topic = rospy.get_param('~reset_topic', "/lmpcc/initialpose")
 
-		self.n_query_agents = rospy.get_param('~number_of_query_agents',9)
-		self.prediction_steps = rospy.get_param('~prediction_steps', 15)
-		self.robot = True
-		self.n_other_agents = 8
+		self.n_peds = 6
+		self.n_robots = 0
+		self.add_robot = False
+		self.n_query_agents = self.n_peds + self.n_robots
+
+		self.prediction_steps = rospy.get_param('~prediction_steps', 20)
+
+		# TODO: make the number of other agents variable
+		# self.n_other_gents = 6
 		# Load Model Parameters
 		self.load_args()
 
@@ -62,36 +77,43 @@ class SocialVDGNN:
 		for i in range(self.prediction_steps):
 			self.robot_plan_.poses.append(PoseStamped())
 
-		# Prediction State variables
-		self.current_position_ = np.zeros([self.n_query_agents ,1,(self.model_args.prev_horizon+1)*2])
-		self.current_velocity_ = np.zeros([self.n_query_agents ,1,(self.model_args.prev_horizon+1)*2])
-		self.predicted_positions = np.zeros([self.n_query_agents,self.model_args.prediction_horizon + 1, 2])
-		self.predicted_velocities = np.zeros([self.n_query_agents, self.model_args.prediction_horizon + 1, 2])
+		# Pedestrians State variables
+		self.current_ids_ = np.zeros([self.n_query_agents, 1])
+		self.current_position_ = np.zeros([self.n_query_agents, (self.model_args.prev_horizon + 1) * 2])
+		self.current_velocity_ = np.zeros([self.n_query_agents, (self.model_args.prev_horizon + 1) * 2])
+		self.predicted_positions = np.zeros([self.n_query_agents, self.model_args.n_mixtures, self.model_args.prediction_horizon, 2])
+		self.predicted_velocities = np.zeros([self.n_query_agents, self.model_args.n_mixtures, self.model_args.prediction_horizon, 2])
+		self.predicted_uncertainty = np.zeros([self.n_query_agents, self.model_args.n_mixtures, self.model_args.prediction_horizon, 2])
+		self.add_noise = False
 
 		self.other_pedestrians = []
-		for i in range(self.n_other_agents):
+		for i in range(self.n_peds):
 			self.other_pedestrians.append(TrackedPerson())
-
-		self.other_agents_info = np.zeros([self.n_query_agents ,1,self.model_args.n_other_agents,self.model_args.pedestrian_vector_dim*self.model_args.prediction_horizon])
 
 		self.load_model()
 
-		self.width = int(self.model_args.submap_width / self.model_args.submap_resolution )
+		if self.model_args.others_info == "angular_grid":
+			self.other_agents_info = np.zeros(
+				[self.n_query_agents, self.model_args.pedestrian_vector_dim])
+		else:
+			self.other_agents_info = np.zeros([self.n_query_agents, self.model_args.pedestrian_vector_dim*self.model_args.n_other_agents])
+
+		self.width = int(self.model_args.submap_width / self.model_args.submap_resolution)
 		self.height = int(self.model_args.submap_height / self.model_args.submap_resolution)
-		self.grid = np.zeros([self.n_query_agents, 1, self.width, self.height])
+		self.batch_grid = np.zeros([self.n_query_agents, self.width, self.height])
 		self.fig_animate = pl.figure('Animation')
 		self.fig_width = 12  # width in inches
 		self.fig_height = 25  # height in inches
 		self.fig_size = [self.fig_width, self.fig_height]
 		self.fontsize = 9
 		self.params = {'backend': 'ps',
-		          'axes.labelsize': self.fontsize,
-		          'font.size': self.fontsize,
-		          'xtick.labelsize': self.fontsize,
-		          'ytick.labelsize': self.fontsize,
-		          'figure.figsize': self.fig_size}
+		               'axes.labelsize': self.fontsize,
+		               'font.size': self.fontsize,
+		               'xtick.labelsize': self.fontsize,
+		               'ytick.labelsize': self.fontsize,
+		               'figure.figsize': self.fig_size}
 		pl.rcParams.update(self.params)
-		#self.ax_pos = pl.subplot()
+		self.ax_pos = pl.subplot()
 		pl.show(block=False)
 
 		self.colors = []
@@ -102,19 +124,22 @@ class SocialVDGNN:
 		self.colors.append([0.9290, 0.6940, 0.1250])  # yellow
 		self.colors.append([0.3010, 0.7450, 0.9330])  # cyan
 		self.colors.append([0.6350, 0.0780, 0.1840])  # chocolate
-		self.colors.append([0.505, 0.505, 0.505])  # grey
-		self.colors.append([0.8, 0.6, 1])  # pink
+		self.colors.append([1, 0.6, 1])  # pink
+		self.colors.append([0.0, 0.405, 1.0])  # grey
 
-
+		self.is_first_step = True
 		# ROS Subscribers
-		# rospy.Subscriber(self.other_agents_topic, TrackedPersons, self.other_agents_CB, queue_size=1)
-		# rospy.Subscriber(self.grid_topic, OccupancyGrid, self.grid_CB, queue_size=1)
-		# rospy.Subscriber(self.robot_state_topic, Pose, self.robot_state_CB, queue_size=1)
-		# rospy.Subscriber(self.robot_plan_topic, Path, self.robot_plan_CB, queue_size=1)
+		rospy.Subscriber(self.other_agents_topic, ObjectArray, self.other_agents_CB, queue_size=1)
+		#rospy.Subscriber(self.grid_topic, OccupancyGrid, self.grid_CB, queue_size=1)
+		rospy.Subscriber(self.robot_state_topic, Odometry, self.robot_state_CB, queue_size=1)
+		rospy.Subscriber(self.robot_plan_topic, Path, self.robot_plan_CB, queue_size=1)
+
+		# ROS Service Clients
 
 		# ROS Publishers
 		self.pub_viz = rospy.Publisher('social_vdgnn_predictions', MarkerArray, queue_size=10)
 		self.obstacles_publisher = rospy.Publisher('ellipse_objects_feed', lmpcc_obstacle_array, queue_size=10)
+		self.pub_robot_traj = rospy.Publisher('plannet_trajectory2', Path, queue_size=10)
 
 		# THread control
 		self.lock = th.Lock()
@@ -122,7 +147,7 @@ class SocialVDGNN:
 	def load_args(self):
 		cwd = os.getcwd()
 
-		model_path = os.path.normpath(cwd + '/../') + '/trained_models/' + self.model_name + "/" + str(self.model_id)
+		model_path = os.path.normpath(cwd) + '/trained_models/' + self.model_name + "/" + str(self.model_id)
 
 		print("Loading data from: '{}'".format(model_path))
 		file = open(model_path + '/model_parameters.pkl', 'rb')
@@ -132,10 +157,14 @@ class SocialVDGNN:
 			model_parameters = pkl.load(file, encoding='latin1')
 		file.close()
 		self.model_args = model_parameters["args"]
-
+		self.model_args.model_path = model_path
+		self.model_args.pretrained_convnet_path = os.path.normpath(cwd) + '/trained_models/autoencoder_with_ped'
 		# change some args because we are doing inference
 		self.model_args.truncated_backprop_length = 1
 		self.model_args.batch_size = self.n_query_agents
+
+		self.n_other_agents = self.model_args.n_other_agents
+		self.other_agents = []
 
 	def load_model(self):
 
@@ -153,30 +182,66 @@ class SocialVDGNN:
 
 		print("Model Initialized")
 
-	def robot_plan_CB(self,msg):
+	def get_local_grid(self,pos,vel):
+		""" Extract occupancy grid from map around specified position and angle
+		@param map_state: OccupancyGrid
+		@param grid_size: int
+		@param pos: [pos]
+		@param angle: float
+		@	return:
+		"""
+		angle = np.arctan2(vel[1], vel[0])
+
+		if np.isnan(angle).any() or np.isnan(pos).any():
+			local_grid = np.empty([int(np.ceil(self.model_args.submap_width / self.model_args.submap_resolution)),
+			                       int(np.ceil(self.model_args.submap_height / self.model_args.submap_resolution))])
+			local_grid.fill(np.nan)
+			return local_grid
+
+		center = (
+			(pos[0] - self.map.info.origin.position.x) / self.map.info.resolution,
+			(pos[1] - self.map.info.origin.position.y) / self.map.info.resolution
+		)
+
+		angle = (angle * 180 / np.pi)
+
+		rotated_map = imutils.rotate_bound(self.gridmap.astype("float32"), angle)
+
+		dst = (int(self.model_args.submap_height/self.model_args.submap_resolution),
+		       int(self.model_args.submap_width/self.model_args.submap_resolution))
+		local_grid = cv2.getRectSubPix(rotated_map.astype("float32"), dst, center)
+
+		if False:
+			self.ax_pos.clear()
+			sup.plot_grid(self.ax_pos, np.array([0.0, 0.0]), local_grid, self.model_args.submap_resolution,
+			              np.array([self.model_args.submap_width, self.model_args.submap_height])*self.model_args.submap_resolution)
+			self.ax_pos.set_xlim([-self.model_args.submap_width / 2, self.model_args.submap_width / 2])
+			self.ax_pos.set_ylim([-self.model_args.submap_height / 2, self.model_args.submap_height / 2])
+			self.ax_pos.set_aspect('equal')
+			self.fig_animate.canvas.draw()
+			pl.show(block=False)
+
+		return local_grid
+
+	def robot_plan_CB(self, msg):
 		self.robot_plan_ = msg
 
 	def robot_state_CB(self, msg):
-		self.robot_state_ = msg
-
-		self.current_position_[-1, 0, 0] = self.robot_state_.position.x
-		self.current_position_[-1, 0, 1] = self.robot_state_.position.y
-		self.current_velocity_[-1, 0, 0] = self.robot_state_.position.z*np.cos(self.robot_state_.orientation.z)
-		self.current_velocity_[-1, 0, 1] = self.robot_state_.position.z*np.sin(self.robot_state_.orientation.z)
+		self.robot_state_ = msg.pose.pose
 
 	def grid_CB(self, data):
 		# scale the grid from 0-100 to 0-1 and invert
 		print("Grid data size: " + str(len(data.data)))
-		self.grid[0,0,:,:] = (np.asarray(data.data).reshape((self.width, self.height)).astype(float) / 100.0)
-		self.grid[0,0,:,:] = np.flip(self.grid[0,0,:,:], 1)
-		self.grid[0,0,:,:] = sup.rotate_grid_around_center(self.grid[0,0,:,:], 90)
+		self.grid[0, 0, :, :] = (np.asarray(data.data).reshape((self.width, self.height)).astype(float) / 100.0)
+		self.grid[0, 0, :, :] = np.flip(self.grid[0, 0, :, :], 1)
+		self.grid[0, 0, :, :] = sup.rotate_grid_around_center(self.grid[0, 0, :, :], 90)
 
 		if False:
 			self.ax_pos.clear()
 			sup.plot_grid(self.ax_pos, np.array([0.0, 0.0]), self.grid, self.model_args.submap_resolution,
 			              np.array([self.model_args.submap_width, self.model_args.submap_height]))
-			self.ax_pos.set_xlim([-self.model_args.submap_width/2,self.model_args.submap_width/2])
-			self.ax_pos.set_ylim([-self.model_args.submap_height/2,self.model_args.submap_height/2])
+			self.ax_pos.set_xlim([-self.model_args.submap_width / 2, self.model_args.submap_width / 2])
+			self.ax_pos.set_ylim([-self.model_args.submap_height / 2, self.model_args.submap_height / 2])
 			self.ax_pos.set_aspect('equal')
 
 	def other_agents_CB(self, data):
@@ -187,246 +252,265 @@ class SocialVDGNN:
 		"""
 		# Assuming that the information about the agents comes always ordered
 		# Shift old states to fill the vector with new info
-		self.current_position_ = np.roll(self.current_position_, 2, axis=2)
-		self.current_velocity_ = np.roll(self.current_velocity_, 2, axis=2)
-		for person_it in range(len(data.tracks)):
-			ped = TrackedPerson()
-			ped.pose=data.tracks[person_it].pose
-			ped.track_id = data.tracks[person_it].track_id
-			ped.twist = data.tracks[person_it].twist
-			self.other_pedestrians[person_it] = ped
+		# self.current_position_ = np.roll(self.current_position_, 2, axis=2)
+		if data.objects:
 
-			self.current_position_[person_it, 0, 0] = ped.pose.pose.position.x
-			self.current_position_[person_it, 0, 1] = ped.pose.pose.position.y
-			self.current_velocity_[person_it, 0, 0] = ped.twist.twist.linear.x
-			self.current_velocity_[person_it, 0, 1] = ped.twist.twist.linear.y
+			self.n_other_agents = len(data.objects)
+			self.other_agents = data.objects
 
-	def fillBatchOtherAgents(self,person_it):
-		n_other_agents = self.n_other_agents
+			self.current_velocity_ = np.roll(self.current_velocity_, 2, axis=1)
+			# if len(data.objects) != self.n_query_agents:
+			# 	print("NUmber of peds do not match callback info")
 
-		other_poses_ordered = np.zeros((n_other_agents+1, 6))
-		if person_it != -1:
-			current_pos = np.array(
-				[self.other_pedestrians[person_it].pose.pose.position.x, self.other_pedestrians[person_it].pose.pose.position.y])
-			current_vel = np.array(
-				[self.other_pedestrians[person_it].twist.twist.linear.x, self.other_pedestrians[person_it].twist.twist.linear.y])
+			other_poses_ordered = np.zeros((len(data.objects), 6))
+			car_pose = np.array([self.robot_state_.position.x,self.robot_state_.position.y])
+
+			# Save all the ped data (x, y, vx, vy, distance to vehicle, id)
+			for i, ped in enumerate(data.objects):
+				other_poses_ordered[i, :2] = np.array([ped.pose.position.x, ped.pose.position.y])
+				other_poses_ordered[i, 2:4] = np.array([ped.twist.linear.x, ped.twist.linear.y])
+				other_poses_ordered[i, 4] = np.linalg.norm(car_pose-other_poses_ordered[i, :2])  # : to i
+				other_poses_ordered[i, 5] = ped.id
+
+				# The vehicle is in the obstacle list, filter it by distance
+				if(other_poses_ordered[i, 4] < 1.0):
+					other_poses_ordered[i, 4] = 999999.0
+
+			# Order Agents (happens correctly)
+			other_poses_ordered = other_poses_ordered[other_poses_ordered[:, 4].argsort()]
+
+			if self.is_first_step:
+				self.is_first_step = False
+				self.prev_ordered_agents = other_poses_ordered
+
+			reset_seq = np.zeros([self.n_query_agents])
+
+			for person_it in range(self.n_query_agents):
+
+				# Check if order of agents has changed
+				if (len(self.prev_ordered_agents) > person_it + 1 and len(other_poses_ordered) > person_it + 1) and\
+						self.prev_ordered_agents[person_it,5] != other_poses_ordered[person_it,5]:
+					self.current_position_[person_it, 0] = other_poses_ordered[person_it,0]
+					self.current_position_[person_it, 1] = other_poses_ordered[person_it,1]
+					self.current_ids_[person_it, 0] = other_poses_ordered[person_it,5]
+
+					# Reset Velocities
+					for prev_step in range(self.model_args.prev_horizon + 1):
+						self.current_velocity_[person_it, 2*prev_step] = other_poses_ordered[person_it,2]
+						self.current_velocity_[person_it, 2*prev_step+1] = other_poses_ordered[person_it,3]
+
+					reset_seq[person_it] = 1
+
+				else:
+					if(len(other_poses_ordered) > person_it + 1):
+						self.current_position_[person_it, 0] = other_poses_ordered[person_it,0]
+						self.current_position_[person_it, 1] = other_poses_ordered[person_it,1]
+						self.current_velocity_[person_it, 0] = other_poses_ordered[person_it,2] + np.random.normal(0, 0.1) * self.add_noise
+						self.current_velocity_[person_it, 1] = other_poses_ordered[person_it,3] + np.random.normal(0, 0.1) * self.add_noise
+
+			# Reset Hidden states
+			self.model.reset_test_cells(reset_seq)
+
+			self.prev_ordered_agents = other_poses_ordered
+
+		else:
+			self.current_velocity_[:,2:4] = self.current_velocity_[:,0:2]
+
+	def fillBatchOtherAgents(self, person_it):
+
+		if self.other_agents:
+			other_poses_ordered = np.zeros((self.n_other_agents, 6))
+			if person_it != -1:
+				current_pos = self.current_position_[person_it, 0:2]
+				current_vel = self.current_position_[person_it, 2:4]
+			else:
+				current_pos = np.array(
+					[self.robot_state_.position.x,
+					 self.robot_state_.position.y])
+				current_vel = np.array(
+					[self.robot_state_.position.z * np.cos(self.robot_state_.orientation.z),
+					 self.robot_state_.position.z * np.sin(self.robot_state_.orientation.z)])
 
 			ag_id = 0
-			for k in range(n_other_agents):
-				if self.other_pedestrians[k].track_id != person_it:
-					other_poses_ordered[ag_id, 0] = self.other_pedestrians[k].pose.pose.position.x
-					other_poses_ordered[ag_id, 1] = self.other_pedestrians[k].pose.pose.position.y
-					other_poses_ordered[ag_id, 2] = self.other_pedestrians[k].twist.twist.linear.x
-					other_poses_ordered[ag_id, 3] = self.other_pedestrians[k].twist.twist.linear.y
-					other_poses_ordered[ag_id, 4] = np.linalg.norm(other_poses_ordered[ag_id, :2] - current_pos)
-					other_poses_ordered[ag_id, 5] = self.other_pedestrians[k].track_id
+			for k in range(self.n_other_agents):
+				if self.other_agents[k].id != self.current_ids_[person_it,0]:
+					other_poses_ordered[ag_id, 0] = self.other_agents[k].pose.position.x - current_pos[0]
+					other_poses_ordered[ag_id, 1] = self.other_agents[k].pose.position.y - current_pos[1]
+					other_poses_ordered[ag_id, 2] = self.other_agents[k].twist.linear.x - current_vel[0]
+					other_poses_ordered[ag_id, 3] = self.other_agents[k].twist.linear.y - current_vel[1]
+					other_poses_ordered[ag_id, 4] = np.linalg.norm(other_poses_ordered[ag_id, :2])
+					other_poses_ordered[ag_id, 5] = np.arctan2(other_poses_ordered[ag_id, 1], other_poses_ordered[ag_id, 0])
 					ag_id += 1
 
 			# Adding robot
-			if self.robot:
-				other_poses_ordered[-1, 0] = self.robot_state_.position.x
-				other_poses_ordered[-1, 1] = self.robot_state_.position.y
-				other_poses_ordered[-1, 2] = self.robot_state_.position.z*np.cos(self.robot_state_.orientation.z)
-				other_poses_ordered[-1, 3] = self.robot_state_.position.z*np.sin(self.robot_state_.orientation.z)
-				other_poses_ordered[-1, 4] = np.linalg.norm(other_poses_ordered[-1, :2] - current_pos)
-				other_poses_ordered[-1, 5] = -1
+			if self.add_robot:
+				other_poses_ordered[-1, 0] = self.robot_state_.position.x - current_pos[0]
+				other_poses_ordered[-1, 1] = self.robot_state_.position.y - current_pos[1]
+				other_poses_ordered[-1, 2] = self.robot_state_.position.z * np.cos(self.robot_state_.orientation.z) - current_vel[0]
+				other_poses_ordered[-1, 3] = self.robot_state_.position.z * np.sin(self.robot_state_.orientation.z) - current_vel[1]
+				other_poses_ordered[-1, 4] = np.linalg.norm(other_poses_ordered[-1, :2])
+				other_poses_ordered[-1, 5] = np.arctan2(other_poses_ordered[-1, 1], other_poses_ordered[-1, 0])
+				other_poses_ordered[-1, 6] = -1
+				other_poses_ordered[-1] *= 0
 
 			other_poses_ordered = other_poses_ordered[other_poses_ordered[:, 4].argsort()]
-			if self.model_args.others_info == "sequence":
-				for pred_step in range(self.model_args.prediction_horizon):
-					current_pos = self.predicted_positions[person_it,pred_step+1]
-					current_vel = self.predicted_velocities[person_it, pred_step+1]
-					ag_id = 0
-					for k in range(min([n_other_agents, self.model_args.n_other_agents])):
-						# surrouding pedestrians info
-						if other_poses_ordered[ag_id, 5] != -1:
-							# cv assuption
-							#next_pose = other_poses_ordered[ag_id, :2] + self.model_args.dt * other_poses_ordered[ag_id, 2:4] * (
-							#		pred_step + 1)
-							# relative_velocity = other_poses_ordered[ag_id, 2:4] - current_vel
-							next_pose = self.predicted_positions[ag_id, pred_step + 1]
-							relative_pose = next_pose - current_pos
-							relative_velocity = self.predicted_velocities[ag_id, pred_step+1] - current_vel
-							self.other_agents_info[person_it-1, 0, ag_id,
-							self.model_args.pedestrian_vector_dim * pred_step:self.model_args.pedestrian_vector_dim * pred_step + 2] = \
-								relative_pose
-							self.other_agents_info[person_it-1, 0, ag_id,
-							self.model_args.pedestrian_vector_dim * pred_step + 2:self.model_args.pedestrian_vector_dim * pred_step + 4] = \
-								relative_velocity
-							self.other_agents_info[person_it - 1, 0, ag_id, self.model_args.pedestrian_vector_dim * pred_step + 4] = \
-								np.arctan2(relative_pose[1], relative_pose[0])
-							self.other_agents_info[person_it - 1, 0, ag_id, self.model_args.pedestrian_vector_dim * pred_step + 5] = \
-								np.linalg.norm(relative_pose)
-						elif other_poses_ordered[ag_id, 5] == -1:
-							# Robot info
-							next_pose = np.array([self.robot_plan_.poses[pred_step].pose.position.x,self.robot_plan_.poses[pred_step].pose.position.y])
-							relative_pose = next_pose - current_pos
-							robot_velocity = np.array([self.robot_plan_.poses[pred_step].pose.orientation.x*np.cos(self.robot_plan_.poses[pred_step].pose.position.z),
-							                           self.robot_plan_.poses[pred_step].pose.orientation.x*np.sin(self.robot_plan_.poses[pred_step].pose.position.z)])
-							relative_velocity = robot_velocity - current_vel
-							self.other_agents_info[person_it-1, 0, ag_id,
-							self.model_args.pedestrian_vector_dim * pred_step:self.model_args.pedestrian_vector_dim * pred_step + 2] = \
-								relative_pose
-							self.other_agents_info[person_it-1, 0, ag_id,
-							self.model_args.pedestrian_vector_dim * pred_step + 2:self.model_args.pedestrian_vector_dim * pred_step + 4] = \
-								relative_velocity
-							self.other_agents_info[person_it-1, 0, ag_id,self.model_args.pedestrian_vector_dim * pred_step + 4] = \
-								np.arctan2(relative_pose[1],relative_pose[0])
-							self.other_agents_info[person_it-1, 0, ag_id,self.model_args.pedestrian_vector_dim * pred_step + 5] = \
-								np.linalg.norm(relative_pose)
-						ag_id += 1
-					for j in range(min([n_other_agents, self.model_args.n_other_agents]), self.model_args.n_other_agents):
-						self.other_agents_info[person_it-1, 0, j, self.pedestrian_vector_dim * pred_step:self.pedestrian_vector_dim * (pred_step+1)] =\
-							np.zeros([self.pedestrian_vector_dim])
-		else:
-			current_pos = np.array(
-				[self.robot_state_.position.x,
-				 self.robot_state_.position.y])
-			current_vel = np.array(
-				[self.robot_state_.position.z*np.cos(self.robot_state_.orientation.z),
-				 self.robot_state_.position.z*np.sin(self.robot_state_.orientation.z)])
+			if self.model_args.others_info == "angular_grid":
+				heading = math.atan2(current_vel[1], current_vel[0])
+				other_pos_local_frame = sup.positions_in_local_frame(current_pos, heading, other_poses_ordered[:, :2])
+				self.other_agents_info[person_it, :] = sup.compute_radial_distance_vector(self.model_args.pedestrian_vector_dim,
+				                                                                          other_pos_local_frame,
+				                                                                          max_range=self.model_args.max_range_ped_grid,
+				                                                                          min_angle=0,
+				                                                                          max_angle=2 * np.pi,
+				                                                                          normalize=True)
+			else:
+				for it in range(min(self.model_args.n_other_agents,self.n_other_agents)):
+					self.other_agents_info[person_it, it*self.model_args.pedestrian_vector_dim:(it+1)*self.model_args.pedestrian_vector_dim] = \
+						other_poses_ordered[it, : self.model_args.pedestrian_vector_dim]
+				for i in range(it+1,self.model_args.n_other_agents):
+					self.other_agents_info[person_it, i*self.model_args.pedestrian_vector_dim:(i+1)*self.model_args.pedestrian_vector_dim] = \
+						other_poses_ordered[it, : self.model_args.pedestrian_vector_dim]
 
-			for ag_id in range(n_other_agents):
-				other_poses_ordered[ag_id, 0] = self.other_pedestrians[ag_id].pose.pose.position.x
-				other_poses_ordered[ag_id, 1] = self.other_pedestrians[ag_id].pose.pose.position.y
-				other_poses_ordered[ag_id, 2] = self.other_pedestrians[ag_id].twist.twist.linear.x
-				other_poses_ordered[ag_id, 3] = self.other_pedestrians[ag_id].twist.twist.linear.y
-				other_poses_ordered[ag_id, 4] = np.linalg.norm(other_poses_ordered[ag_id, :2] - current_pos)
-				other_poses_ordered[ag_id, 5] = self.other_pedestrians[ag_id].track_id
-
-			other_poses_ordered = other_poses_ordered[other_poses_ordered[:, 4].argsort()]
-			if self.model_args.others_info == "sequence":
-				for pred_step in range(self.model_args.prediction_horizon):
-					current_pos = self.predicted_positions[person_it, pred_step + 1]
-					current_vel = self.predicted_velocities[person_it, pred_step + 1]
-					for ag_id in range(min([n_other_agents, self.model_args.n_other_agents])):
-						next_pose = other_poses_ordered[ag_id, :2] + self.model_args.dt * other_poses_ordered[ag_id, 2:4] * (
-									pred_step + 1)
-						relative_pose = next_pose - current_pos
-						relative_velocity = other_poses_ordered[ag_id, 2:4] - current_vel
-						self.other_agents_info[person_it - 1, 0, ag_id,
-						self.model_args.pedestrian_vector_dim * pred_step:self.model_args.pedestrian_vector_dim * pred_step + 2] = \
-								relative_pose
-						self.other_agents_info[person_it - 1, 0, ag_id,
-						self.model_args.pedestrian_vector_dim * pred_step + 2:self.model_args.pedestrian_vector_dim * pred_step + 4] = \
-								relative_velocity
-						self.other_agents_info[person_it - 1, 0, ag_id, self.model_args.pedestrian_vector_dim * pred_step + 4] = \
-								np.arctan2(relative_pose[1], relative_pose[0])
-						self.other_agents_info[person_it - 1, 0, ag_id, self.model_args.pedestrian_vector_dim * pred_step + 5] = \
-								np.linalg.norm(relative_pose)
-
-					for j in range(min([n_other_agents, self.model_args.n_other_agents]), self.model_args.n_other_agents):
-						self.other_agents_info[person_it - 1, 0, j,
-						self.pedestrian_vector_dim * pred_step:self.pedestrian_vector_dim * (pred_step + 1)] = \
-							np.zeros([self.pedestrian_vector_dim])
+		#self.batch_grid[person_it] = self.get_local_grid(current_pos,current_vel)
 
 	# query feed the data into the net and calculates the trajectory
 	def query(self):
 		# Each agent query per batch dimension
-		if self.robot:
-			for person_it in range(-1,len(self.other_pedestrians),1):
-				self.fillBatchOtherAgents(self.other_pedestrians[person_it].track_id)
-		else:
-			for person_it in range(len(self.other_pedestrians)):
-				self.fillBatchOtherAgents(self.other_pedestrians[person_it].track_id)
-		feed_dict_ = self.model.feed_test_dic(self.current_velocity_, self.grid, self.other_agents_info, 0)
+		for person_it in range(0, self.n_query_agents):
+			self.fillBatchOtherAgents(person_it)
+
+		dict = {"batch_vel": self.current_velocity_,
+		        "batch_initial_vel": self.current_velocity_[:,0:2],
+		        "batch_pos": self.current_position_[:,0:2],
+		        "batch_initial_uncertainty": np.ones_like(self.current_position_[:, 0:2])*0.2,
+		        "batch_ped_grid": self.other_agents_info,
+		        "batch_grid": self.batch_grid,
+		        "step": 0
+		        }
+		feed_dict_ = self.model.feed_pred_dic(**dict)
 
 		outputs = self.model.predict(self.sess, feed_dict_, True)
 
-		#y_model_pred, output_decoder, outs = outputs
+		# y_model_pred, output_decoder, outs = outputs
 
 		# publish the predicted trajectories
-		self.global_trajectories = self.calculate_trajectories(outputs[0])
+		#self.global_trajectories = self.calculate_trajectories(outputs[0])
 
 	# add the velocity predictions together to form points and convert them to global coordinate frame
 	def calculate_trajectories(self, y_model_pred):
-
 		global_trajectory = MarkerArray()
 		pedestrians = lmpcc_obstacle_array()
 
-		time = np.zeros([self.model_args.prediction_horizon + 1])
-		for ped_id in range(-1,y_model_pred.shape[0]-1,1):
-			mix_idx = 0
-			if ped_id != -1:
-				self.predicted_positions[ped_id,0] = self.current_position_[ped_id,0,:2]
-				self.predicted_velocities[ped_id, 0] = self.current_velocity_[ped_id,0,:2]
-			else:
-				self.predicted_positions[ped_id,0] = np.array([self.robot_state_.position.x,self.robot_state_.position.y])
-				self.predicted_velocities[ped_id, 0] = np.array([self.robot_state_.position.z*np.cos(self.robot_state_.orientation.z), \
-				                                                 self.robot_state_.position.z*np.sin(self.robot_state_.orientation.z)])
+		#time = np.zeros([self.model_args.prediction_horizon + 1])
+		# Robot TRajectory to warm-start
+		robot_trajectory = Path()
+		robot_trajectory.header.frame_id = "odom"
+		robot_trajectory.header.stamp = rospy.Time.now()
 
-			for pred_step in range(self.model_args.prediction_horizon):
-				idx = pred_step * self.model_args.output_pred_state_dim * self.model_args.n_mixtures + mix_idx
-				# TODO: this can be optimized
-				# TODO: fill velocity vector
-				time[pred_step +1] = time[pred_step] + self.model_args.dt
-				self.predicted_positions[ped_id,pred_step+1,0] = self.predicted_positions[ped_id,pred_step,0] + y_model_pred[ped_id,0, idx] * self.model_args.dt
-				self.predicted_positions[ped_id,pred_step+1,1] = self.predicted_positions[ped_id,pred_step,1] + y_model_pred[ped_id,0, idx + self.model_args.n_mixtures] * self.model_args.dt
-				self.predicted_velocities[ped_id,pred_step+1,0] =  y_model_pred[ped_id,0, idx]
-				self.predicted_velocities[ped_id, pred_step + 1, 0] = y_model_pred[ped_id,0, idx + self.model_args.n_mixtures]
-			# up-sample trajectory to match lmpcc
-			# the dt time should match the mpc horizon step
-			#new_time, new_pos =  sup.smoothenTrajectory(time,positions,velocities,self.model_args,dt=0.2)
-			ped = lmpcc_obstacle()
+		for ped_id in range(0, y_model_pred.shape[0]):
+			for mix_idx in range(self.model_args.n_mixtures):
 
-			# 15 is the number of stages of the mpcc. it should match
-			for pred_step in range(15):
-				marker = Marker()
-				marker.header.frame_id = "odom"
-				marker.header.stamp = rospy.Time.now()
-				marker.ns = "goal_marker"
-				marker.id = pred_step + self.model_args.prediction_horizon*ped_id
-				marker.type = 3
-				marker.color.a = 1.0/(1.0+pred_step/3.0)
-				marker.color.r = self.colors[ped_id][0]
-				marker.color.g = self.colors[ped_id][1]
-				marker.color.b = self.colors[ped_id][2]
-				marker.scale.x = 0.3*2.0
-				marker.scale.y = 0.3*2.0
-				marker.scale.z = 0.1
-				pose = Pose()
+				self.predicted_positions[ped_id,mix_idx, 0, 0] = self.current_position_[ped_id, 0]  # + y_model_pred[ped_id,0, 0] * self.model_args.dt
+				self.predicted_positions[ped_id,mix_idx, 0, 1] = self.current_position_[ped_id, 1]  # + y_model_pred[ped_id,0, self.model_args.n_mixtures] * self.model_args.dt
+				self.predicted_velocities[ped_id,mix_idx, 0] = self.current_velocity_[ped_id, :2]
 
-				pose.position.x = self.predicted_positions[ped_id,pred_step,0]
-				pose.position.y = self.predicted_positions[ped_id,pred_step,1]
-				pose.orientation.w = 1.0
-				marker.pose = pose
-				pose_stamped = PoseStamped()
-				# Used for LMPCC
-				pose_stamped.pose = pose
+				for pred_step in range(1, self.model_args.prediction_horizon):
+					idx = (pred_step - 1) * self.model_args.output_pred_state_dim * self.model_args.n_mixtures + mix_idx
+					# TODO: this can be optimized
+					# TODO: fill velocity vector
+					#time[pred_step + 1] = time[pred_step] + self.model_args.dt
+					self.predicted_positions[ped_id, mix_idx, pred_step, 0] = self.predicted_positions[ped_id, mix_idx, pred_step - 1, 0] + \
+					                                                 y_model_pred[ped_id, 0, idx] * self.model_args.dt
+					self.predicted_positions[ped_id, mix_idx, pred_step, 1] = self.predicted_positions[ped_id, mix_idx, pred_step - 1, 1] + \
+					                                                 y_model_pred[ped_id, 0, idx + self.model_args.n_mixtures] * self.model_args.dt
+					self.predicted_velocities[ped_id, mix_idx,pred_step, 0] = y_model_pred[ped_id, 0, idx]
+					self.predicted_velocities[ped_id, mix_idx,pred_step, 1] = y_model_pred[ped_id, 0, idx + self.model_args.n_mixtures]
+					if self.model_args.output_pred_state_dim > 2:
+						self.predicted_uncertainty[ped_id, mix_idx, pred_step, 0] = y_model_pred[ped_id, 0, idx + 2 * self.model_args.n_mixtures]
+						self.predicted_uncertainty[ped_id, mix_idx, pred_step, 0] = y_model_pred[ped_id, 0, idx + 3 * self.model_args.n_mixtures]
+				# up-sample trajectory to match lmpcc
+				# the dt time should match the mpc horizon step
+				# new_time, new_pos =  sup.smoothenTrajectory(time,positions,velocities,self.model_args,dt=0.2)
+				ped = lmpcc_obstacle()
+
+				# 15 is the number of stages of the mpcc. it should match
+				sigma_x = 1
+				sigma_y = 1
+				for pred_step in range(self.model_args.prediction_horizon):
+					marker = Marker()
+					marker.header.frame_id = "map"
+					marker.header.stamp = rospy.Time.now()
+					marker.ns = "goal_marker"
+					marker.id = pred_step + self.model_args.prediction_horizon * ped_id * mix_idx
+					marker.type = 3
+					marker.color.a = 1.0 / (1.0 + pred_step / 3.0)
+					marker.color.r = self.colors[ped_id % 9][0]
+					marker.color.g = self.colors[ped_id%9][1]
+					marker.color.b = self.colors[ped_id%9][2]
+					marker.scale.x = 1 * sigma_x
+					marker.scale.y = 1 * sigma_y
+					marker.scale.z = 0.1
+					pose = Pose()
+
+					pose.position.x = self.predicted_positions[ped_id, mix_idx, pred_step, 0]
+					pose.position.y = self.predicted_positions[ped_id, mix_idx, pred_step, 1]
+					pose.orientation.w = 1.0
+					marker.pose = pose
+					pose_stamped = PoseStamped()
+					# Used for LMPCC
+					pose_stamped.pose = pose
+					if ped_id != -1:
+						ped.trajectory.poses.append(pose_stamped)
+						# TODo: Use uncertainty info
+						if self.model_args.output_pred_state_dim > 2:
+							sigma_x += np.square(
+								self.predicted_uncertainty[ped_id, mix_idx, pred_step, 0]) * self.model_args.dt * self.model_args.dt
+							sigma_y += np.square(
+								self.predicted_uncertainty[ped_id, mix_idx, pred_step, 1]) * self.model_args.dt * self.model_args.dt
+							ped.major_semiaxis.append(sigma_x)
+							ped.minor_semiaxis.append(sigma_y)
+						else:
+							ped.major_semiaxis.append(1)
+							ped.minor_semiaxis.append(1)
+					else:
+						robot_trajectory.poses.append(pose_stamped)
+					global_trajectory.markers.append(marker)
 				if ped_id != -1:
-					ped.trajectory.poses.append(pose_stamped)
-					# TODo: Use uncertainty info
-					ped.major_semiaxis.append(0.3)
-					ped.minor_semiaxis.append(0.3)
-					ped.pose = pose_stamped.pose
-				global_trajectory.markers.append(marker)
-			if ped_id != -1:
-				pedestrians.lmpcc_obstacles.append(ped)
+					ped.pose = ped.trajectory.poses[0].pose
+					pedestrians.lmpcc_obstacles.append(ped)
 
+		# self.pub_robot_traj.publish(robot_trajectory)
 		self.obstacles_publisher.publish(pedestrians)
 		self.pub_viz.publish(global_trajectory)
 
 		return global_trajectory
 
+
 if __name__ == '__main__':
-	print("Imports succeeded yess!")
-	sys.exit()
 	rospy.init_node('SocialVDGNN_node')
 	prediction_network = SocialVDGNN()
-	rospy.sleep(5.0)
+	rospy.sleep(1.0)
+
+	total_run_time = 0.0
+	total_runs = 0
 	while not rospy.is_shutdown():
 		start_time = time.time()
 
 		prediction_network.lock.acquire()
+		prediction_network.planning = True
 		prediction_network.query()
+		prediction_network.planning = False
 		prediction_network.lock.release()
-		#planning_network.fig_animate.canvas.draw()
-		#cv2.imshow("image", planning_network.grid)
-		#cv2.waitKey(100)
+		# planning_network.fig_animate.canvas.draw()
+		# cv2.imshow("image", planning_network.grid)
+		# cv2.waitKey(100)
 		# wait around a bit if neccesairy
 		now = time.time()
-		if now - start_time < 0.05:  # args.dt:
-			rospy.sleep(0.05 - (now - start_time))
+		total_run_time += now - start_time
+		total_runs += 1
+		if now - start_time < 0.1:  # args.dt:
+			rospy.sleep(0.1 - (now - start_time))
 		else:
-			rospy.loginfo("not keeping up to rate")
+			print("not keeping up to rate")
+	print("Avg run time: {} ms".format(total_run_time / (total_runs / 1000.0)))
 	prediction_network.sess.close()
