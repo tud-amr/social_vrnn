@@ -9,6 +9,7 @@ import cv2
 import math
 import numpy as np
 from collections import deque
+from scipy.spatial.transform import Rotation
 
 import tensorflow as tf
 from models.SocialVRNN import NetworkModel as SocialVRNN
@@ -73,7 +74,7 @@ class SocialVRNN_Predictor:
       self._agents_vel_ls[0] = self._agents_vel
 
       # Collect the position and velocity data
-      positions = self._roboat_pos.reshape((1, -1))
+      positions_ct = self._roboat_pos.reshape((1, -1))
       velocities_tl = self._roboat_vel_ls.reshape((1, -1))
       if self._agents_pos:
          # Order agents by distance from roboat
@@ -83,7 +84,7 @@ class SocialVRNN_Predictor:
          ord_agents_ind = ord_agents_ind[:min(QUERY_AGENTS - 1, len(self._agents_pos))]
 
          # Set agent positions
-         positions = np.concatenate((positions, agents_pos_np[ord_agents_ind]), axis=0)
+         positions_ct = np.concatenate((positions_ct, agents_pos_np[ord_agents_ind]), axis=0)
 
          # Set agent velocities
          velocities_tl = np.concatenate((velocities_tl, np.zeros((len(ord_agents_ind), velocities_tl.shape[1]), dtype=float)), axis=0)
@@ -93,6 +94,26 @@ class SocialVRNN_Predictor:
                   assert tl_ind != 0
                   continue
                velocities_tl[ag_ind + 1][2*tl_ind:2*(tl_ind+1)] = self._agents_vel_ls[tl_ind][ord_agents_ind[ag_ind]]
+
+      # Calculate the relative odometry
+      relative_odometry = np.zeros((len(positions_ct), len(positions_ct) * 4), dtype=float)
+      for sub_id in range(len(positions_ct)):
+         for obj_id in range(len(positions_ct)):
+            if obj_id == sub_id: continue
+            # Copy vectors for modification
+            sub_pos, obj_pos = positions_ct[sub_id].copy(), positions_ct[obj_id].copy()
+            sub_vel, obj_vel = velocities_tl[sub_id][:2].copy(), velocities_tl[obj_id][:2].copy()
+            sub_head = Rotation.from_euler('z', math.atan2(sub_vel[1], sub_vel[0]))
+
+            # Translate and rotate object position to subject FOR
+            obj_pos -= sub_pos
+            obj_pos = sub_head.inv().apply(np.append(obj_pos, 0))[:2]
+
+            # Rotate object velocity to subject FOR
+            obj_vel = sub_head.inv().apply(np.append(obj_vel, 0))[:2]
+
+            # Set respective field
+            relative_odometry[sub_id][4*obj_id:4*(obj_id+1)] = np.concatenate((obj_pos, obj_vel))
 
 
    def publish(self, predictions):
