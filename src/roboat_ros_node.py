@@ -123,7 +123,7 @@ class SocialVRNN_Predictor:
 
       return self.model.predict(
          self.tf_session,
-         self.model.feed_test_dic(
+         self.model.feed_pred_dic(
             batch_vel = velocities_tl,
             batch_initial_vel = velocities_tl[:, :2],
             batch_pos = positions_ct,
