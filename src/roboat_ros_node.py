@@ -60,6 +60,9 @@ class SocialVRNN_Predictor:
 
    def infer(self):
       if self._get_submap is None: return None, None
+      if not self._agents_pos:
+         rospy.logwarn('No other agents present, skipping path prediction')
+         return None, None
 
       # Maintain past roboat velocities
       if not hasattr(self, '_roboat_vel_ls'):
@@ -74,52 +77,68 @@ class SocialVRNN_Predictor:
       self._agents_vel_ls.rotate(1)
       self._agents_vel_ls[0] = self._agents_vel
 
-      # Collect the position and velocity data
+      # ----------- positions and velocity matrix ----------
+      # Collect the position and velocity data ordered by query priority
       positions_ct = self._roboat_pos.reshape((1, -1))
       velocities_tl = self._roboat_vel_ls.reshape((1, -1))
-      if self._agents_pos:
-         # Order agents by distance from roboat
-         agents_pos_np = np.full((max(self._agents_pos.keys()) + 1, 2), float('inf'), dtype=float)
-         for id in self._agents_pos.keys(): agents_pos_np[id] = self._agents_pos[id]
-         ord_agents_ind = np.argsort(np.linalg.norm(agents_pos_np - self._roboat_pos, axis=1))
-         ord_agents_ind = ord_agents_ind[:min(QUERY_AGENTS - 1, len(self._agents_pos))]
 
-         # Set agent positions
-         positions_ct = np.concatenate((positions_ct, agents_pos_np[ord_agents_ind]), axis=0)
+      # Order agents by distance from roboat
+      agents_pos_np = np.full((max(self._agents_pos.keys()) + 1, 2), float('inf'), dtype=float)
+      for id in self._agents_pos.keys(): agents_pos_np[id] = self._agents_pos[id]
+      ord_agents_ind = np.argsort(np.linalg.norm(agents_pos_np - self._roboat_pos, axis=1))
+      ord_agents_ind = ord_agents_ind[:min(QUERY_AGENTS - 1, len(self._agents_pos))]
 
-         # Set agent velocities
-         velocities_tl = np.concatenate((velocities_tl, np.zeros((len(ord_agents_ind), velocities_tl.shape[1]), dtype=float)), axis=0)
-         for tl_ind in range(len(self._agents_vel_ls)):
-            for ag_ind in range(len(ord_agents_ind)):
-               if ord_agents_ind[ag_ind] not in self._agents_vel_ls[tl_ind]:
-                  assert tl_ind != 0
-                  continue
-               velocities_tl[ag_ind + 1][2*tl_ind:2*(tl_ind+1)] = self._agents_vel_ls[tl_ind][ord_agents_ind[ag_ind]]
+      # Set agent positions
+      positions_ct = np.concatenate((positions_ct, agents_pos_np[ord_agents_ind]), axis=0)
+
+      # Set agent velocities
+      velocities_tl = np.concatenate((velocities_tl, np.zeros((len(ord_agents_ind), velocities_tl.shape[1]), dtype=float)), axis=0)
+      for tl_ind in range(len(self._agents_vel_ls)):
+         for ag_ind in range(len(ord_agents_ind)):
+            if ord_agents_ind[ag_ind] not in self._agents_vel_ls[tl_ind]: assert tl_ind != 0; continue
+            velocities_tl[ag_ind + 1][2*tl_ind:2*(tl_ind+1)] = self._agents_vel_ls[tl_ind][ord_agents_ind[ag_ind]]
+      # ----------------------------------------------------
+
+      # ------------- relative odometry matrix -------------
+      # Obtain object positions ordered by id
+      obj_pos = self._roboat_pos.reshape((1, -1))
+      agents_pos_np = np.full((max(self._agents_pos.keys()) + 1, 2), float('inf'), dtype=float)
+      for id in self._agents_pos.keys(): agents_pos_np[id] = self._agents_pos[id]
+      obj_pos = np.concatenate((obj_pos, agents_pos_np[1:]), axis=0)
+
+      # Obtain object headings ordered by id
+      obj_vel = self._roboat_vel.reshape((1, -1))
+      agents_vel_np = np.full((max(self._agents_vel.keys()) + 1, 2), float('inf'), dtype=float)
+      for id in self._agents_vel.keys(): agents_vel_np[id] = self._agents_vel[id]
+      obj_vel = np.concatenate((obj_vel, agents_vel_np[1:]), axis=0)
+
+      # Calculate the relative odometry
+      relative_odometry = np.zeros((len(positions_ct), self.model_args.n_other_agents * 4), dtype=float)
+      for sub_ind, sub_pos in enumerate(positions_ct):
+         sub_head = Rotation.from_euler('z', math.atan2(velocities_tl[sub_ind][1], velocities_tl[sub_ind][0]))
+
+         # Get n-nearest neighbours
+         nn_inds = np.argsort(np.linalg.norm(obj_pos - sub_pos, axis=1))[1:]
+         if len(nn_inds) < self.model_args.n_other_agents: nn_inds = np.concatenate((nn_inds, np.repeat(nn_inds[-1], self.model_args.n_other_agents - len(nn_inds))))
+         if len(nn_inds) > self.model_args.n_other_agents: nn_inds = nn_inds[:self.model_args.n_other_agents]
+
+         # Calculate relative positions
+         nn_pos = obj_pos[nn_inds].copy()
+         nn_pos -= sub_pos
+         nn_pos = sub_head.inv().apply(np.concatenate((nn_pos, np.zeros((len(nn_pos), 1))), axis=1))[:, :2]
+
+         # Calculate relative velocities
+         nn_vel = obj_vel[nn_inds].copy()
+         nn_vel = sub_head.inv().apply(np.concatenate((nn_vel, np.zeros((len(nn_vel), 1))), axis=1))[:, :2]
+
+         # Set relative odometry vector
+         relative_odometry[sub_ind] = np.concatenate((nn_pos, nn_vel), axis=1).flatten()
+      # ----------------------------------------------------
 
       # Get the submaps
       submaps = np.zeros((len(positions_ct), self.model_args.submap_width, self.model_args.submap_height), dtype=float)
       for id in range(len(positions_ct)):
          submaps[id] = np.transpose(self._get_submap(positions_ct[id], velocities_tl[id][:2]))
-
-      # Calculate the relative odometry
-      relative_odometry = np.zeros((len(positions_ct), len(positions_ct) * 4), dtype=float)
-      for sub_id in range(len(positions_ct)):
-         for obj_id in range(len(positions_ct)):
-            if obj_id == sub_id: continue
-            # Copy vectors for modification
-            sub_pos, obj_pos = positions_ct[sub_id].copy(), positions_ct[obj_id].copy()
-            sub_vel, obj_vel = velocities_tl[sub_id][:2].copy(), velocities_tl[obj_id][:2].copy()
-            sub_head = Rotation.from_euler('z', math.atan2(sub_vel[1], sub_vel[0]))
-
-            # Translate and rotate object position to subject FOR
-            obj_pos -= sub_pos
-            obj_pos = sub_head.inv().apply(np.append(obj_pos, 0))[:2]
-
-            # Rotate object velocity to subject FOR
-            obj_vel = sub_head.inv().apply(np.append(obj_vel, 0))[:2]
-
-            # Set respective field
-            relative_odometry[sub_id][4*obj_id:4*(obj_id+1)] = np.concatenate((obj_pos, obj_vel))
 
       # Predict the future positions
       return positions_ct, self.model.predict(
@@ -271,7 +290,6 @@ class SocialVRNN_Predictor:
          ]
 
       self._get_submap = get_submap
-      rospy.loginfo('Saved occupancy grid.')
 
 
    def _store_roboat_state(self, roboat_state_msg):
