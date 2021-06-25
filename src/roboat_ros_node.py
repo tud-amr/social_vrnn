@@ -14,12 +14,12 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import rospy, rospkg
 from nav_msgs.msg import OccupancyGrid, Odometry
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, PoseStamped
 from visualization_msgs.msg import Marker, MarkerArray
-from social_vrnn.msg import lmpcc_obstacle_array as LMPCC_Obstacle_Array
+from social_vrnn.msg import lmpcc_obstacle_array as LMPCC_Obstacle_Array, svrnn_path as SVRNN_Path, svrnn_path_array as SVRNN_Path_Array
 
 PACKAGE_NAME = 'social_vrnn'
-QUERY_AGENTS = 6 # including roboat
+QUERY_AGENTS = 4 # includes roboat
 
 
 class SocialVRNN_Predictor:
@@ -44,6 +44,15 @@ class SocialVRNN_Predictor:
       self._roboat_vel = np.zeros((2, ), dtype=float)
       self._agents_pos, self._agents_vel = {}, {}
 
+      # Generic marker
+      self._mrk = Marker()
+      self._mrk.header.frame_id = 'odom'
+      self._mrk.action = Marker.ADD
+      self._mrk.lifetime.secs = 1.0
+      self._mrk.scale.x, self._mrk.scale.y, self._mrk.scale.z = 1.0, 1.0, 1.0
+      self._mrk.color.r, self._mrk.color.g, self._mrk.color.b, self._mrk.color.a = 1.0, 1.0, 1.0, 1.0
+      self._mrk.pose.orientation.w = 1.0
+
       # Load the model
       self.model_args = self._get_model_args('SocialVRNN', '500')
       self.model, self.tf_session = self._load_model(SocialVRNN, self.model_args)
@@ -54,14 +63,15 @@ class SocialVRNN_Predictor:
       rospy.Subscriber('/roboat_localization/odometry_ekf/odometry_filtered', Odometry, self._store_roboat_state)
 
       # Set up publishers
+      self._pred_path_publisher = rospy.Publisher('/{}/predictions'.format(self._node_name), SVRNN_Path_Array, latch=True, queue_size=10)
       self._pos_mark_publisher = rospy.Publisher('/{}/markers/positions'.format(self._node_name), MarkerArray, latch=True, queue_size=10)
       self._pred_mark_publisher = rospy.Publisher('/{}/markers/predictions'.format(self._node_name), MarkerArray, latch=True, queue_size=10)
 
 
    def infer(self):
       if self._get_submap is None: return None, None
-      if not self._agents_pos:
-         rospy.logwarn('No other agents present, skipping path prediction')
+      if len(self._agents_pos) < QUERY_AGENTS - 1:
+         rospy.logwarn('Too few other agents present, skipping path prediction')
          return None, None
 
       # Maintain past roboat velocities
@@ -69,6 +79,7 @@ class SocialVRNN_Predictor:
          self._roboat_vel_ls = np.zeros((self.model_args.prev_horizon + 1, 2), dtype=float)
       self._roboat_vel_ls = np.roll(self._roboat_vel_ls, 1, axis=0)
       self._roboat_vel_ls[0] = self._roboat_vel
+      # for i in range(self.model_args.prev_horizon + 1): self._roboat_vel_ls[i] = self._roboat_vel
 
       # Maintain past agents velocities
       if not hasattr(self, '_agents_vel_ls'):
@@ -76,6 +87,7 @@ class SocialVRNN_Predictor:
          for _ in range(self.model_args.prev_horizon + 1): self._agents_vel_ls.append({})
       self._agents_vel_ls.rotate(1)
       self._agents_vel_ls[0] = self._agents_vel
+      # for i in range(self.model_args.prev_horizon + 1): self._agents_vel_ls[i] = self._agents_vel
 
       # ----------- positions and velocity matrix ----------
       # Collect the position and velocity data ordered by query priority
@@ -86,7 +98,7 @@ class SocialVRNN_Predictor:
       agents_pos_np = np.full((max(self._agents_pos.keys()) + 1, 2), float('inf'), dtype=float)
       for id in self._agents_pos.keys(): agents_pos_np[id] = self._agents_pos[id]
       ord_agents_ind = np.argsort(np.linalg.norm(agents_pos_np - self._roboat_pos, axis=1))
-      ord_agents_ind = ord_agents_ind[:min(QUERY_AGENTS - 1, len(self._agents_pos))]
+      ord_agents_ind = ord_agents_ind[:QUERY_AGENTS - 1]
 
       # Set agent positions
       positions_ct = np.concatenate((positions_ct, agents_pos_np[ord_agents_ind]), axis=0)
@@ -139,15 +151,13 @@ class SocialVRNN_Predictor:
       submaps = np.zeros((len(positions_ct), self.model_args.submap_width, self.model_args.submap_height), dtype=float)
       for id in range(len(positions_ct)):
          submaps[id] = np.transpose(self._get_submap(positions_ct[id], velocities_tl[id][:2]))
+         # submaps[id] = np.zeros((60, 60), dtype=float)
 
       # Predict the future positions
       return positions_ct, self.model.predict(
          self.tf_session,
          self.model.feed_pred_dic(
             batch_vel = velocities_tl,
-            batch_initial_vel = velocities_tl[:, :2],
-            batch_pos = positions_ct,
-            batch_initial_uncertainty = 0.2 * np.ones_like(positions_ct),
             batch_ped_grid = relative_odometry,
             batch_grid = submaps,
             step = 0
@@ -159,30 +169,15 @@ class SocialVRNN_Predictor:
    def publish(self, curr_positions, pred_positions):
       if pred_positions is None: return
 
-      # Generic marker
-      mrk = Marker()
-      mrk.header.frame_id = 'odom'
-      mrk.action = Marker.ADD
-      mrk.scale.x, mrk.scale.y, mrk.scale.z = 1.0, 1.0, 1.0
-      mrk.color.r, mrk.color.g, mrk.color.b, mrk.color.a = 1.0, 1.0, 1.0, 1.0
-      mrk.pose.orientation.w = 1.0
-
-      # Publish curent boat positions
-      curr_positions_mrk = MarkerArray()
-      for id, pos in enumerate(curr_positions):
-         ag_mrk = copy.deepcopy(mrk)
-         ag_mrk.id = id
-         ag_mrk.type = Marker.SPHERE
-         ag_mrk.pose.position.x = pos[0]
-         ag_mrk.pose.position.y = pos[1]
-         curr_positions_mrk.markers.append(ag_mrk)
-      self._pos_mark_publisher.publish(curr_positions_mrk)
-
       # Publish predicted positions
+      pred_positions_path = SVRNN_Path_Array()
       pred_positions_mrk = MarkerArray()
       for id, pred in enumerate(pred_positions):
+         path_msg = SVRNN_Path()
+         path_msg.id = float(id)
+         path_msg.dt = self.model_args.dt
          for mx_id in range(self.model_args.n_mixtures):
-            path_mrk = copy.deepcopy(mrk)
+            path_mrk = copy.deepcopy(self._mrk)
             path_mrk.id = self.model_args.n_mixtures * id + mx_id
             path_mrk.type = Marker.LINE_STRIP
             path_mrk.scale.x = 0.1
@@ -193,12 +188,18 @@ class SocialVRNN_Predictor:
             path_mrk.color.b = float(mx_id == 2)
             prev_x, prev_y = 0.0, 0.0
             for ts_id in range(self.model_args.prediction_horizon):
+               pose = PoseStamped()
                pt = Point()
-               pt.x = prev_x + node.model_args.dt * pred[0][4 * (mx_id * self.model_args.prediction_horizon + ts_id) + 0]
-               pt.y = prev_y + node.model_args.dt * pred[0][4 * (mx_id * self.model_args.prediction_horizon + ts_id) + 1]
+               idx = ts_id * self.model_args.output_pred_state_dim * self.model_args.n_mixtures + mx_id
+               pt.x = prev_x + self.model_args.dt * pred[0][idx]
+               pt.y = prev_y + self.model_args.dt * pred[0][idx + self.model_args.n_mixtures]
                path_mrk.points.append(pt)
+               pose.pose.position = pt
+               path_msg.path.poses.append(pose)
                prev_x, prev_y = pt.x, pt.y
             pred_positions_mrk.markers.append(path_mrk)
+         pred_positions_path.paths.append(path_msg)
+      self._pred_path_publisher.publish(pred_positions_path)
       self._pred_mark_publisher.publish(pred_positions_mrk)
 
 
@@ -227,6 +228,16 @@ class SocialVRNN_Predictor:
 
 
    def _store_occupancy_grid(self, occupancy_grid_msg):
+      # Reset class state
+      self._roboat_pos = np.zeros((2, ), dtype=float)
+      self._roboat_vel = np.zeros((2, ), dtype=float)
+      self._agents_pos, self._agents_vel = {}, {}
+      if hasattr(self, '_roboat_last_update'): delattr(self, '_roboat_last_update')
+      if hasattr(self, '_agents_last_update'): delattr(self, '_agents_last_update')
+      if hasattr(self, '_roboat_vel_ls'): delattr(self, '_roboat_vel_ls')
+      if hasattr(self, '_agents_vel_ls'): delattr(self, '_agents_vel_ls')
+      rospy.loginfo('Cleared history context')
+
       # Makes 1 pixel equal to 1 submap pixel
       scale_factor = occupancy_grid_msg.info.resolution / self.model_args.submap_resolution
 
@@ -306,11 +317,11 @@ class SocialVRNN_Predictor:
          self._roboat_vel[1] = (curr_y - prev_y) / (curr_time - self._roboat_last_update)
       self._roboat_last_update = curr_time
 
-      if self._get_submap is not None:
-         submap = self._get_submap(self._roboat_pos, self._roboat_vel)
-         submap[submap > 0] = 255
-         cv2.imshow('submap', submap)
-         cv2.waitKey(1)
+      # if self._get_submap is not None:
+      #    submap = self._get_submap(self._roboat_pos, self._roboat_vel)
+      #    submap[submap > 0] = 255
+      #    cv2.imshow('submap', submap)
+      #    cv2.waitKey(1)
 
       
    def _store_world_state(self, world_state_msg):
@@ -320,6 +331,8 @@ class SocialVRNN_Predictor:
       curr_pos, curr_vel = {}, {}
       for agent_msg in world_state_msg.lmpcc_obstacles:
          id = int(agent_msg.id)
+         if id > 3: continue
+
          curr_x = agent_msg.pose.position.x
          curr_y = agent_msg.pose.position.y
          curr_pos[id] = np.array([curr_x, curr_y], dtype=float)
@@ -332,6 +345,20 @@ class SocialVRNN_Predictor:
 
       self._agents_pos, self._agents_vel = curr_pos, curr_vel
       self._agents_last_update = curr_time
+
+      # Publish curent boat positions
+      curr_positions_mrk = MarkerArray()
+      for id, pos in self._agents_pos.items():
+         ag_mrk = copy.deepcopy(self._mrk)
+         ag_mrk.id = id
+         ag_mrk.type = Marker.SPHERE
+         ag_mrk.color.r = float(id % 3 == 0)
+         ag_mrk.color.g = float(id % 3 == 1)
+         ag_mrk.color.b = float(id % 3 == 2)
+         ag_mrk.pose.position.x = pos[0]
+         ag_mrk.pose.position.y = pos[1]
+         curr_positions_mrk.markers.append(ag_mrk)
+      self._pos_mark_publisher.publish(curr_positions_mrk)
 
 
    def _shutdown_callback(self):

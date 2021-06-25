@@ -16,6 +16,8 @@ add_message_files(
    FILES
    lmpcc_obstacle.msg
    lmpcc_obstacle_array.msg
+   svrnn_path.msg
+   svrnn_path_array.msg
 )
 
 generate_messages(
