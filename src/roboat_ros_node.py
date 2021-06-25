@@ -1,29 +1,25 @@
 #!/usr/bin/env python
 
-from operator import pos
-import sys; print("Running with {}".format(sys.version))
-import os
-import copy
-import time
-import pickle
-import cv2
-import math
-import numpy as np
-from collections import deque
-from scipy.spatial.transform import Rotation
+import os, sys; print("Running with {}".format(sys.version))
+import copy, time, pickle, math, collections
 
+from scipy.spatial.transform import Rotation
 import tensorflow as tf
+import numpy as np
+import cv2
+
 from models.SocialVRNN import NetworkModel as SocialVRNN
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-import rospkg
-import rospy
+import rospy, rospkg
 from nav_msgs.msg import OccupancyGrid, Odometry
+from geometry_msgs.msg import Point
+from visualization_msgs.msg import Marker, MarkerArray
 from social_vrnn.msg import lmpcc_obstacle_array as LMPCC_Obstacle_Array
 
 PACKAGE_NAME = 'social_vrnn'
-QUERY_AGENTS = 3 # including roboat
+QUERY_AGENTS = 6 # including roboat
 
 
 class SocialVRNN_Predictor:
@@ -57,9 +53,13 @@ class SocialVRNN_Predictor:
       rospy.Subscriber('/ellipse_objects_feed', LMPCC_Obstacle_Array, self._store_world_state)
       rospy.Subscriber('/roboat_localization/odometry_ekf/odometry_filtered', Odometry, self._store_roboat_state)
 
+      # Set up publishers
+      self._pos_mark_publisher = rospy.Publisher('/{}/markers/positions'.format(self._node_name), MarkerArray, latch=True, queue_size=10)
+      self._pred_mark_publisher = rospy.Publisher('/{}/markers/predictions'.format(self._node_name), MarkerArray, latch=True, queue_size=10)
+
 
    def infer(self):
-      if self._get_submap is None: return None
+      if self._get_submap is None: return None, None
 
       # Maintain past roboat velocities
       if not hasattr(self, '_roboat_vel_ls'):
@@ -69,7 +69,7 @@ class SocialVRNN_Predictor:
 
       # Maintain past agents velocities
       if not hasattr(self, '_agents_vel_ls'):
-         self._agents_vel_ls = deque()
+         self._agents_vel_ls = collections.deque()
          for _ in range(self.model_args.prev_horizon + 1): self._agents_vel_ls.append({})
       self._agents_vel_ls.rotate(1)
       self._agents_vel_ls[0] = self._agents_vel
@@ -121,7 +121,8 @@ class SocialVRNN_Predictor:
             # Set respective field
             relative_odometry[sub_id][4*obj_id:4*(obj_id+1)] = np.concatenate((obj_pos, obj_vel))
 
-      return self.model.predict(
+      # Predict the future positions
+      return positions_ct, self.model.predict(
          self.tf_session,
          self.model.feed_pred_dic(
             batch_vel = velocities_tl,
@@ -133,12 +134,53 @@ class SocialVRNN_Predictor:
             step = 0
          ),
          True
-      )
+      )[0]
 
 
-   def publish(self, predictions):
-      if predictions is None: return
-      rospy.loginfo("Predicting...")
+   def publish(self, curr_positions, pred_positions):
+      if pred_positions is None: return
+
+      # Generic marker
+      mrk = Marker()
+      mrk.header.frame_id = 'odom'
+      mrk.action = Marker.ADD
+      mrk.scale.x, mrk.scale.y, mrk.scale.z = 1.0, 1.0, 1.0
+      mrk.color.r, mrk.color.g, mrk.color.b, mrk.color.a = 1.0, 1.0, 1.0, 1.0
+      mrk.pose.orientation.w = 1.0
+
+      # Publish curent boat positions
+      curr_positions_mrk = MarkerArray()
+      for id, pos in enumerate(curr_positions):
+         ag_mrk = copy.deepcopy(mrk)
+         ag_mrk.id = id
+         ag_mrk.type = Marker.SPHERE
+         ag_mrk.pose.position.x = pos[0]
+         ag_mrk.pose.position.y = pos[1]
+         curr_positions_mrk.markers.append(ag_mrk)
+      self._pos_mark_publisher.publish(curr_positions_mrk)
+
+      # Publish predicted positions
+      pred_positions_mrk = MarkerArray()
+      for id, pred in enumerate(pred_positions):
+         for mx_id in range(self.model_args.n_mixtures):
+            path_mrk = copy.deepcopy(mrk)
+            path_mrk.id = self.model_args.n_mixtures * id + mx_id
+            path_mrk.type = Marker.LINE_STRIP
+            path_mrk.scale.x = 0.1
+            path_mrk.pose.position.x = curr_positions[id][0]
+            path_mrk.pose.position.y = curr_positions[id][1]
+            path_mrk.color.r = float(mx_id == 0)
+            path_mrk.color.g = float(mx_id == 1)
+            path_mrk.color.b = float(mx_id == 2)
+            prev_x, prev_y = 0.0, 0.0
+            for ts_id in range(self.model_args.prediction_horizon):
+               pt = Point()
+               pt.x = prev_x + node.model_args.dt * pred[0][4 * (mx_id * self.model_args.prediction_horizon + ts_id) + 0]
+               pt.y = prev_y + node.model_args.dt * pred[0][4 * (mx_id * self.model_args.prediction_horizon + ts_id) + 1]
+               path_mrk.points.append(pt)
+               prev_x, prev_y = pt.x, pt.y
+            pred_positions_mrk.markers.append(path_mrk)
+      self._pred_mark_publisher.publish(pred_positions_mrk)
 
 
    def _get_model_args(self, model_name, train_run):
@@ -291,8 +333,8 @@ if __name__ == '__main__':
    while not rospy.is_shutdown():
       start_time = time.time()
 
-      predictions = node.infer()
-      node.publish(predictions)
+      curr_positions, pred_positions = node.infer()
+      node.publish(curr_positions, pred_positions)
       
       elapsed = time.time() - start_time
       if elapsed < node.model_args.dt: rospy.sleep(node.model_args.dt - elapsed)
