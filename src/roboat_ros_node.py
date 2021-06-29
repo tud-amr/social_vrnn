@@ -6,7 +6,6 @@ import copy, time, pickle, math, collections
 from scipy.spatial.transform import Rotation
 import tensorflow as tf
 import numpy as np
-import cv2
 
 from models.SocialVRNN import NetworkModel as SocialVRNN
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
@@ -18,8 +17,12 @@ from geometry_msgs.msg import Point, PoseStamped
 from visualization_msgs.msg import Marker, MarkerArray
 from social_vrnn.msg import lmpcc_obstacle_array as LMPCC_Obstacle_Array, svrnn_path as SVRNN_Path, svrnn_path_array as SVRNN_Path_Array
 
+print(sys.path)
+sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
+import cv2
+
 PACKAGE_NAME = 'social_vrnn'
-QUERY_AGENTS = 4 # includes roboat
+QUERY_AGENTS = 6 # includes roboat
 
 
 class SocialVRNN_Predictor:
@@ -48,7 +51,7 @@ class SocialVRNN_Predictor:
       self._mrk = Marker()
       self._mrk.header.frame_id = 'odom'
       self._mrk.action = Marker.ADD
-      self._mrk.lifetime.secs = 1.0
+      self._mrk.lifetime.secs = int(1.0)
       self._mrk.scale.x, self._mrk.scale.y, self._mrk.scale.z = 1.0, 1.0, 1.0
       self._mrk.color.r, self._mrk.color.g, self._mrk.color.b, self._mrk.color.a = 1.0, 1.0, 1.0, 1.0
       self._mrk.pose.orientation.w = 1.0
@@ -193,9 +196,10 @@ class SocialVRNN_Predictor:
                idx = ts_id * self.model_args.output_pred_state_dim * self.model_args.n_mixtures + mx_id
                pt.x = prev_x + self.model_args.dt * pred[0][idx]
                pt.y = prev_y + self.model_args.dt * pred[0][idx + self.model_args.n_mixtures]
-               path_mrk.points.append(pt)
                pose.pose.position = pt
                path_msg.path.poses.append(pose)
+               pt.z = 0.2
+               path_mrk.points.append(pt)
                prev_x, prev_y = pt.x, pt.y
             pred_positions_mrk.markers.append(path_mrk)
          pred_positions_path.paths.append(path_msg)
@@ -350,7 +354,7 @@ class SocialVRNN_Predictor:
       curr_positions_mrk = MarkerArray()
       for id, pos in self._agents_pos.items():
          ag_mrk = copy.deepcopy(self._mrk)
-         ag_mrk.id = id
+         ag_mrk.id = int(id)
          ag_mrk.type = Marker.SPHERE
          ag_mrk.color.r = float(id % 3 == 0)
          ag_mrk.color.g = float(id % 3 == 1)
