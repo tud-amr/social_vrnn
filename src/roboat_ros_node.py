@@ -117,7 +117,7 @@ class SocialVRNN_Predictor:
          # submaps[id] = np.zeros((60, 60), dtype=float) # disable occupancies (for debugging)
 
       # Predict the future velocities
-      return self.model.predict(
+      return copy.deepcopy(self.agents_pos), self.model.predict(
          self.tf_session,
          self.model.feed_pred_dic(
             batch_vel = self._agents_vel_ls,
@@ -129,13 +129,13 @@ class SocialVRNN_Predictor:
       )[0]
 
 
-   def publish(self, pred_velocities):
+   def publish(self, agents_pos, pred_velocities):
       if pred_velocities is None: return
 
       # Publish predicted positions
       pred_velocities_path = SVRNN_Path_Array()
       pred_velocities_mrk = MarkerArray()
-      for id in self.agents_pos.keys():
+      for id in agents_pos.keys():
          pred = pred_velocities[id]
          path_msg = SVRNN_Path()
          path_msg.id = float(id)
@@ -145,8 +145,8 @@ class SocialVRNN_Predictor:
             path_mrk.id = self.model_args.n_mixtures * id + mx_id
             path_mrk.type = Marker.LINE_STRIP
             path_mrk.scale.x = 0.1
-            path_mrk.pose.position.x = self.agents_pos[id][1] if SWITCH_AXES else self.agents_pos[id][0]
-            path_mrk.pose.position.y = self.agents_pos[id][0] if SWITCH_AXES else self.agents_pos[id][1]
+            path_mrk.pose.position.x = agents_pos[id][1] if SWITCH_AXES else agents_pos[id][0]
+            path_mrk.pose.position.y = agents_pos[id][0] if SWITCH_AXES else agents_pos[id][1]
             path_mrk.color.r = float(mx_id == 0)
             path_mrk.color.g = float(mx_id == 1)
             path_mrk.color.b = float(mx_id == 2)
@@ -341,8 +341,8 @@ if __name__ == '__main__':
    while not rospy.is_shutdown():
       start_time = time.time()
 
-      pred_velocities = node.infer()
-      node.publish(pred_velocities)
+      agents_pos, pred_velocities = node.infer()
+      node.publish(agents_pos, pred_velocities)
       
       elapsed = time.time() - start_time
       if elapsed < node.model_args.dt: rospy.sleep(node.model_args.dt - elapsed)
