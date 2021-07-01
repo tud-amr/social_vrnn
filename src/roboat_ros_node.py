@@ -68,10 +68,10 @@ class SocialVRNN_Predictor:
 
 
    def infer(self):
-      if self.get_submap is None: return
+      if self.get_submap is None: return None, None
       if len(self.agents_pos) < 2:
          rospy.logwarn('No other agents present, skipping path prediction')
-         return
+         return None, None
 
       # Build NumPy matrices from world state
       active_agents = np.full((MAX_QUERY_AGENTS, ), False, dtype=bool)
