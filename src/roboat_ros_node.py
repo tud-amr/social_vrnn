@@ -23,6 +23,7 @@ import cv2
 
 PACKAGE_NAME = 'social_vrnn'
 MAX_QUERY_AGENTS = 10
+SWITCH_AXES = True
 
 
 class SocialVRNN_Predictor:
@@ -147,8 +148,8 @@ class SocialVRNN_Predictor:
             path_mrk.id = self.model_args.n_mixtures * id + mx_id
             path_mrk.type = Marker.LINE_STRIP
             path_mrk.scale.x = 0.1
-            path_mrk.pose.position.x = self.agents_pos[id][0]
-            path_mrk.pose.position.y = self.agents_pos[id][1]
+            path_mrk.pose.position.x = self.agents_pos[id][1] if SWITCH_AXES else self.agents_pos[id][0]
+            path_mrk.pose.position.y = self.agents_pos[id][0] if SWITCH_AXES else self.agents_pos[id][1]
             path_mrk.color.r = float(mx_id == 0)
             path_mrk.color.g = float(mx_id == 1)
             path_mrk.color.b = float(mx_id == 2)
@@ -157,8 +158,8 @@ class SocialVRNN_Predictor:
                pose = PoseStamped()
                pt = Point()
                idx = ts_id * self.model_args.output_pred_state_dim * self.model_args.n_mixtures + mx_id
-               pt.x = prev_x + self.model_args.dt * pred[0][idx]
-               pt.y = prev_y + self.model_args.dt * pred[0][idx + self.model_args.n_mixtures]
+               pt.x = prev_x + self.model_args.dt * pred[0][idx + (self.model_args.n_mixtures if SWITCH_AXES else 0)]
+               pt.y = prev_y + self.model_args.dt * pred[0][idx + (0 if SWITCH_AXES else self.model_args.n_mixtures)]
                pose.pose.position = pt
                path_msg.path.poses.append(pose)
                pt.z = 0.2
@@ -289,6 +290,11 @@ class SocialVRNN_Predictor:
             ], dtype=float)
          else: curr_vel[id] = np.zeros((2, ), dtype=float)
 
+      if SWITCH_AXES:
+         for id in curr_pos.keys():
+            curr_pos[id][0], curr_pos[id][1] = curr_pos[id][1], curr_pos[id][0]
+            curr_vel[id][0], curr_vel[id][1] = curr_vel[id][1], curr_vel[id][0]
+
       self.agents_pos, self.agents_vel = curr_pos, curr_vel
       self._agents_last_update = curr_time
 
@@ -301,8 +307,8 @@ class SocialVRNN_Predictor:
          ag_mrk.color.r = float(id % 3 == 0)
          ag_mrk.color.g = float(id % 3 == 1)
          ag_mrk.color.b = float(id % 3 == 2)
-         ag_mrk.pose.position.x = pos[0]
-         ag_mrk.pose.position.y = pos[1]
+         ag_mrk.pose.position.x = pos[1] if SWITCH_AXES else pos[0]
+         ag_mrk.pose.position.y = pos[0] if SWITCH_AXES else pos[1]
          curr_positions_mrk.markers.append(ag_mrk)
       self.pos_mark_publisher.publish(curr_positions_mrk)
 
