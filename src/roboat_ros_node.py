@@ -22,7 +22,7 @@ sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
 import cv2
 
 PACKAGE_NAME = 'social_vrnn'
-QUERY_AGENTS = 6 # includes roboat
+MAX_QUERY_AGENTS = 10
 
 
 class SocialVRNN_Predictor:
@@ -33,134 +33,96 @@ class SocialVRNN_Predictor:
 
 
    def __init__(self, node_name, visual_node_name):
-      self._node_name = node_name
-      self._visual_node_name = visual_node_name
+      self.node_name, self.visual_node_name = node_name, visual_node_name
 
       # Bind node
-      rospy.init_node(self._node_name)
-      rospy.on_shutdown(self._shutdown_callback)
-      rospy.loginfo('{} has started.'.format(self._visual_node_name))
+      rospy.init_node(self.node_name)
+      rospy.on_shutdown(self.shutdown_callback)
+      rospy.loginfo('{} has started.'.format(self.visual_node_name))
 
       # Set up class variables
-      self._get_submap = None # function to request submap for some position
-      self._roboat_pos = np.zeros((2, ), dtype=float)
-      self._roboat_vel = np.zeros((2, ), dtype=float)
-      self._agents_pos, self._agents_vel = {}, {}
+      self.get_submap = None # function to request submap for some position
+      self.agents_pos, self.agents_vel = {}, {} # dictionary of world state
 
-      # Generic marker
-      self._mrk = Marker()
-      self._mrk.header.frame_id = 'odom'
-      self._mrk.action = Marker.ADD
-      self._mrk.lifetime.secs = int(1.0)
-      self._mrk.scale.x, self._mrk.scale.y, self._mrk.scale.z = 1.0, 1.0, 1.0
-      self._mrk.color.r, self._mrk.color.g, self._mrk.color.b, self._mrk.color.a = 1.0, 1.0, 1.0, 1.0
-      self._mrk.pose.orientation.w = 1.0
+      # Generic marker template
+      mrk = Marker()
+      mrk.header.frame_id = 'odom'
+      mrk.action = Marker.ADD
+      mrk.lifetime.secs = int(1.0)
+      mrk.scale.x, mrk.scale.y, mrk.scale.z = 1.0, 1.0, 1.0
+      mrk.color.r, mrk.color.g, mrk.color.b, mrk.color.a = 1.0, 1.0, 1.0, 1.0
+      mrk.pose.orientation.w = 1.0
+      self.marker_template = mrk
 
       # Load the model
-      self.model_args = self._get_model_args('SocialVRNN', '500')
-      self.model, self.tf_session = self._load_model(SocialVRNN, self.model_args)
+      self.model_args = self.get_model_args('SocialVRNN', '500')
+      self.model, self.tf_session = self.load_model(SocialVRNN, self.model_args)
 
       # Set up subscribers
-      rospy.Subscriber('/roboat_cloud/obstacle/map', OccupancyGrid, self._store_occupancy_grid)
-      rospy.Subscriber('/ellipse_objects_feed', LMPCC_Obstacle_Array, self._store_world_state)
-      rospy.Subscriber('/roboat_localization/odometry_ekf/odometry_filtered', Odometry, self._store_roboat_state)
+      rospy.Subscriber('/roboat_cloud/obstacle/map', OccupancyGrid, self.store_occupancy_grid)
+      rospy.Subscriber('/ellipse_objects_feed', LMPCC_Obstacle_Array, self.store_world_state)
+      rospy.Subscriber('/roboat_localization/odometry_ekf/odometry_filtered', Odometry, self.store_roboat_state)
 
       # Set up publishers
-      self._pred_path_publisher = rospy.Publisher('/{}/predictions'.format(self._node_name), SVRNN_Path_Array, latch=True, queue_size=10)
-      self._pos_mark_publisher = rospy.Publisher('/{}/markers/positions'.format(self._node_name), MarkerArray, latch=True, queue_size=10)
-      self._pred_mark_publisher = rospy.Publisher('/{}/markers/predictions'.format(self._node_name), MarkerArray, latch=True, queue_size=10)
+      self.pred_path_publisher = rospy.Publisher('/{}/predictions'.format(self.node_name), SVRNN_Path_Array, latch=True, queue_size=10)
+      self.pos_mark_publisher = rospy.Publisher('/{}/markers/positions'.format(self.node_name), MarkerArray, latch=True, queue_size=10)
+      self.pred_mark_publisher = rospy.Publisher('/{}/markers/predictions'.format(self.node_name), MarkerArray, latch=True, queue_size=10)
 
 
    def infer(self):
-      if self._get_submap is None: return None, None
-      if len(self._agents_pos) < QUERY_AGENTS - 1:
-         rospy.logwarn('Too few other agents present, skipping path prediction')
-         return None, None
+      if self.get_submap is None: return
+      if len(self.agents_pos) < 2:
+         rospy.logwarn('No other agents present, skipping path prediction')
+         return
 
-      # Maintain past roboat velocities
-      if not hasattr(self, '_roboat_vel_ls'):
-         self._roboat_vel_ls = np.zeros((self.model_args.prev_horizon + 1, 2), dtype=float)
-      self._roboat_vel_ls = np.roll(self._roboat_vel_ls, 1, axis=0)
-      self._roboat_vel_ls[0] = self._roboat_vel
-      # for i in range(self.model_args.prev_horizon + 1): self._roboat_vel_ls[i] = self._roboat_vel
+      # Build NumPy matrices from world state
+      active_agents = np.full((MAX_QUERY_AGENTS, ), False, dtype=bool)
+      for id in self.agents_pos.keys(): active_agents[id] = True
+
+      agents_pos_np = np.zeros((MAX_QUERY_AGENTS, 2), dtype=float)
+      for id, pos in self.agents_pos.items(): agents_pos_np[id] = pos
+
+      agents_vel_np = np.zeros((MAX_QUERY_AGENTS, 2), dtype=float)
+      for id, vel in self.agents_vel.items(): agents_vel_np[id] = vel
 
       # Maintain past agents velocities
       if not hasattr(self, '_agents_vel_ls'):
-         self._agents_vel_ls = collections.deque()
-         for _ in range(self.model_args.prev_horizon + 1): self._agents_vel_ls.append({})
-      self._agents_vel_ls.rotate(1)
-      self._agents_vel_ls[0] = self._agents_vel
-      # for i in range(self.model_args.prev_horizon + 1): self._agents_vel_ls[i] = self._agents_vel
-
-      # ----------- positions and velocity matrix ----------
-      # Collect the position and velocity data ordered by query priority
-      positions_ct = self._roboat_pos.reshape((1, -1))
-      velocities_tl = self._roboat_vel_ls.reshape((1, -1))
-
-      # Order agents by distance from roboat
-      agents_pos_np = np.full((max(self._agents_pos.keys()) + 1, 2), float('inf'), dtype=float)
-      for id in self._agents_pos.keys(): agents_pos_np[id] = self._agents_pos[id]
-      ord_agents_ind = np.argsort(np.linalg.norm(agents_pos_np - self._roboat_pos, axis=1))
-      ord_agents_ind = ord_agents_ind[:QUERY_AGENTS - 1]
-
-      # Set agent positions
-      positions_ct = np.concatenate((positions_ct, agents_pos_np[ord_agents_ind]), axis=0)
-
-      # Set agent velocities
-      velocities_tl = np.concatenate((velocities_tl, np.zeros((len(ord_agents_ind), velocities_tl.shape[1]), dtype=float)), axis=0)
-      for tl_ind in range(len(self._agents_vel_ls)):
-         for ag_ind in range(len(ord_agents_ind)):
-            if ord_agents_ind[ag_ind] not in self._agents_vel_ls[tl_ind]: assert tl_ind != 0; continue
-            velocities_tl[ag_ind + 1][2*tl_ind:2*(tl_ind+1)] = self._agents_vel_ls[tl_ind][ord_agents_ind[ag_ind]]
-      # ----------------------------------------------------
-
-      # ------------- relative odometry matrix -------------
-      # Obtain object positions ordered by id
-      obj_pos = self._roboat_pos.reshape((1, -1))
-      agents_pos_np = np.full((max(self._agents_pos.keys()) + 1, 2), float('inf'), dtype=float)
-      for id in self._agents_pos.keys(): agents_pos_np[id] = self._agents_pos[id]
-      obj_pos = np.concatenate((obj_pos, agents_pos_np[1:]), axis=0)
-
-      # Obtain object headings ordered by id
-      obj_vel = self._roboat_vel.reshape((1, -1))
-      agents_vel_np = np.full((max(self._agents_vel.keys()) + 1, 2), float('inf'), dtype=float)
-      for id in self._agents_vel.keys(): agents_vel_np[id] = self._agents_vel[id]
-      obj_vel = np.concatenate((obj_vel, agents_vel_np[1:]), axis=0)
+         self._agents_vel_ls = np.zeros((MAX_QUERY_AGENTS, 2 * (self.model_args.prev_horizon + 1)), dtype=float)
+      self._agents_vel_ls = np.roll(self._agents_vel_ls, 2, axis=1)
+      self._agents_vel_ls[:, :2] = agents_vel_np
 
       # Calculate the relative odometry
-      relative_odometry = np.zeros((len(positions_ct), self.model_args.n_other_agents * 4), dtype=float)
-      for sub_ind, sub_pos in enumerate(positions_ct):
-         sub_head = Rotation.from_euler('z', math.atan2(velocities_tl[sub_ind][1], velocities_tl[sub_ind][0]))
+      relative_odometry = np.zeros((MAX_QUERY_AGENTS, 4 * self.model_args.n_other_agents), dtype=float)
+      for sub_ind in np.arange(MAX_QUERY_AGENTS)[active_agents]:
 
          # Get n-nearest neighbours
-         nn_inds = np.argsort(np.linalg.norm(obj_pos - sub_pos, axis=1))[1:]
+         nn_inds = np.argsort(np.linalg.norm(agents_pos_np[active_agents] - agents_pos_np[sub_ind], axis=1))[1:]
          if len(nn_inds) < self.model_args.n_other_agents: nn_inds = np.concatenate((nn_inds, np.repeat(nn_inds[-1], self.model_args.n_other_agents - len(nn_inds))))
          if len(nn_inds) > self.model_args.n_other_agents: nn_inds = nn_inds[:self.model_args.n_other_agents]
 
          # Calculate relative positions
-         nn_pos = obj_pos[nn_inds].copy()
-         nn_pos -= sub_pos
-         nn_pos = sub_head.inv().apply(np.concatenate((nn_pos, np.zeros((len(nn_pos), 1))), axis=1))[:, :2]
+         nn_pos = agents_pos_np[active_agents][nn_inds].copy()
+         nn_pos -= agents_pos_np[sub_ind]
 
          # Calculate relative velocities
-         nn_vel = obj_vel[nn_inds].copy()
-         nn_vel = sub_head.inv().apply(np.concatenate((nn_vel, np.zeros((len(nn_vel), 1))), axis=1))[:, :2]
+         nn_vel = agents_vel_np[active_agents][nn_inds].copy()
+         nn_vel -= agents_vel_np[sub_ind]
 
          # Set relative odometry vector
          relative_odometry[sub_ind] = np.concatenate((nn_pos, nn_vel), axis=1).flatten()
-      # ----------------------------------------------------
 
       # Get the submaps
-      submaps = np.zeros((len(positions_ct), self.model_args.submap_width, self.model_args.submap_height), dtype=float)
-      for id in range(len(positions_ct)):
-         submaps[id] = np.transpose(self._get_submap(positions_ct[id], velocities_tl[id][:2]))
-         # submaps[id] = np.zeros((60, 60), dtype=float)
+      submaps = np.zeros((MAX_QUERY_AGENTS, self.model_args.submap_width, self.model_args.submap_height), dtype=float)
+      for id in np.arange(MAX_QUERY_AGENTS)[active_agents]:
+         if self.get_submap is None: return
+         submaps[id] = np.transpose(self.get_submap(agents_pos_np[id], agents_vel_np[id]))
+         # submaps[id] = np.zeros((60, 60), dtype=float) # disable occupancies (for debugging)
 
-      # Predict the future positions
-      return positions_ct, self.model.predict(
+      # Predict the future velocities
+      return self.model.predict(
          self.tf_session,
          self.model.feed_pred_dic(
-            batch_vel = velocities_tl,
+            batch_vel = self._agents_vel_ls,
             batch_ped_grid = relative_odometry,
             batch_grid = submaps,
             step = 0
@@ -169,23 +131,24 @@ class SocialVRNN_Predictor:
       )[0]
 
 
-   def publish(self, curr_positions, pred_positions):
-      if pred_positions is None: return
+   def publish(self, pred_velocities):
+      if pred_velocities is None: return
 
       # Publish predicted positions
-      pred_positions_path = SVRNN_Path_Array()
-      pred_positions_mrk = MarkerArray()
-      for id, pred in enumerate(pred_positions):
+      pred_velocities_path = SVRNN_Path_Array()
+      pred_velocities_mrk = MarkerArray()
+      for id in self.agents_pos.keys():
+         pred = pred_velocities[id]
          path_msg = SVRNN_Path()
          path_msg.id = float(id)
          path_msg.dt = self.model_args.dt
          for mx_id in range(self.model_args.n_mixtures):
-            path_mrk = copy.deepcopy(self._mrk)
+            path_mrk = copy.deepcopy(self.marker_template)
             path_mrk.id = self.model_args.n_mixtures * id + mx_id
             path_mrk.type = Marker.LINE_STRIP
             path_mrk.scale.x = 0.1
-            path_mrk.pose.position.x = curr_positions[id][0]
-            path_mrk.pose.position.y = curr_positions[id][1]
+            path_mrk.pose.position.x = self.agents_pos[id][0]
+            path_mrk.pose.position.y = self.agents_pos[id][1]
             path_mrk.color.r = float(mx_id == 0)
             path_mrk.color.g = float(mx_id == 1)
             path_mrk.color.b = float(mx_id == 2)
@@ -201,13 +164,13 @@ class SocialVRNN_Predictor:
                pt.z = 0.2
                path_mrk.points.append(pt)
                prev_x, prev_y = pt.x, pt.y
-            pred_positions_mrk.markers.append(path_mrk)
-         pred_positions_path.paths.append(path_msg)
-      self._pred_path_publisher.publish(pred_positions_path)
-      self._pred_mark_publisher.publish(pred_positions_mrk)
+            pred_velocities_mrk.markers.append(path_mrk)
+         pred_velocities_path.paths.append(path_msg)
+      self.pred_path_publisher.publish(pred_velocities_path)
+      self.pred_mark_publisher.publish(pred_velocities_mrk)
 
 
-   def _get_model_args(self, model_name, train_run):
+   def get_model_args(self, model_name, train_run):
       trained_dir = os.path.join(rospkg.RosPack().get_path(PACKAGE_NAME), 'trained_models')
       model_dir = os.path.join(trained_dir, model_name, train_run)
       convnet_dir = os.path.join(trained_dir, 'autoencoder_with_ped')
@@ -215,13 +178,13 @@ class SocialVRNN_Predictor:
          model_args = pickle.load(f)["args"]
       model_args.model_path = model_dir
       model_args.pretrained_convnet_path = convnet_dir
-      model_args.batch_size = QUERY_AGENTS
+      model_args.batch_size = MAX_QUERY_AGENTS
       model_args.truncated_backprop_length = 1
       model_args.keep_prob = 1.0
       return model_args
 
 
-   def _load_model(self, model_class, model_args):
+   def load_model(self, model_class, model_args):
       model = model_class(model_args)
       tf_session = tf.Session()
       model.warmstart_model(model_args, tf_session)
@@ -231,15 +194,13 @@ class SocialVRNN_Predictor:
       return model, tf_session
 
 
-   def _store_occupancy_grid(self, occupancy_grid_msg):
+   def store_occupancy_grid(self, occupancy_grid_msg):
       # Reset class state
-      self._roboat_pos = np.zeros((2, ), dtype=float)
-      self._roboat_vel = np.zeros((2, ), dtype=float)
-      self._agents_pos, self._agents_vel = {}, {}
-      if hasattr(self, '_roboat_last_update'): delattr(self, '_roboat_last_update')
-      if hasattr(self, '_agents_last_update'): delattr(self, '_agents_last_update')
-      if hasattr(self, '_roboat_vel_ls'): delattr(self, '_roboat_vel_ls')
-      if hasattr(self, '_agents_vel_ls'): delattr(self, '_agents_vel_ls')
+      def safedelattr(attr):
+         if hasattr(self, attr): delattr(self, attr)
+      safedelattr('_roboat_pos'); safedelattr('_roboat_last_update')
+      self.agents_pos, self.agents_vel = {}, {}; safedelattr('_agents_last_update')
+      self.get_submap = None; safedelattr('_agents_vel_ls')
       rospy.loginfo('Cleared history context')
 
       # Makes 1 pixel equal to 1 submap pixel
@@ -304,41 +265,22 @@ class SocialVRNN_Predictor:
             int(origin_offset[0]-self.model_args.submap_width/2) : int(origin_offset[0]+self.model_args.submap_width/2)
          ]
 
-      self._get_submap = get_submap
-
-
-   def _store_roboat_state(self, roboat_state_msg):
-      curr_time = time.time()
-      prev_x = self._roboat_pos[0]
-      prev_y = self._roboat_pos[1]
-      curr_x = roboat_state_msg.pose.pose.position.x
-      curr_y = roboat_state_msg.pose.pose.position.y
-
-      self._roboat_pos[0] = curr_x
-      self._roboat_pos[1] = curr_y
-      if hasattr(self, '_roboat_last_update'):
-         self._roboat_vel[0] = (curr_x - prev_x) / (curr_time - self._roboat_last_update)
-         self._roboat_vel[1] = (curr_y - prev_y) / (curr_time - self._roboat_last_update)
-      self._roboat_last_update = curr_time
-
-      # if self._get_submap is not None:
-      #    submap = self._get_submap(self._roboat_pos, self._roboat_vel)
-      #    submap[submap > 0] = 255
-      #    cv2.imshow('submap', submap)
-      #    cv2.waitKey(1)
+      self.get_submap = get_submap
 
       
-   def _store_world_state(self, world_state_msg):
+   def store_world_state(self, world_state_msg):
       curr_time = time.time()
-      prev_pos = copy.deepcopy(self._agents_pos)
+      prev_pos = copy.deepcopy(self.agents_pos)
 
       curr_pos, curr_vel = {}, {}
+      if hasattr(self, '_roboat_pos'):
+         curr_pos[0], curr_vel[0] = self._roboat_pos, self._roboat_vel
+
       for agent_msg in world_state_msg.lmpcc_obstacles:
          id = int(agent_msg.id)
-         if id > 3: continue
+         # if id > 2: continue # only process small subset (for debugging)
 
-         curr_x = agent_msg.pose.position.x
-         curr_y = agent_msg.pose.position.y
+         curr_x, curr_y = agent_msg.pose.position.x, agent_msg.pose.position.y
          curr_pos[id] = np.array([curr_x, curr_y], dtype=float)
          if hasattr(self, '_agents_last_update') and id in prev_pos:
             curr_vel[id] = np.array([
@@ -347,13 +289,13 @@ class SocialVRNN_Predictor:
             ], dtype=float)
          else: curr_vel[id] = np.zeros((2, ), dtype=float)
 
-      self._agents_pos, self._agents_vel = curr_pos, curr_vel
+      self.agents_pos, self.agents_vel = curr_pos, curr_vel
       self._agents_last_update = curr_time
 
       # Publish curent boat positions
       curr_positions_mrk = MarkerArray()
-      for id, pos in self._agents_pos.items():
-         ag_mrk = copy.deepcopy(self._mrk)
+      for id, pos in self.agents_pos.items():
+         ag_mrk = copy.deepcopy(self.marker_template)
          ag_mrk.id = int(id)
          ag_mrk.type = Marker.SPHERE
          ag_mrk.color.r = float(id % 3 == 0)
@@ -362,11 +304,26 @@ class SocialVRNN_Predictor:
          ag_mrk.pose.position.x = pos[0]
          ag_mrk.pose.position.y = pos[1]
          curr_positions_mrk.markers.append(ag_mrk)
-      self._pos_mark_publisher.publish(curr_positions_mrk)
+      self.pos_mark_publisher.publish(curr_positions_mrk)
 
 
-   def _shutdown_callback(self):
-      rospy.loginfo('{} was terminated.'.format(self._visual_node_name))
+   def store_roboat_state(self, roboat_state_msg):
+      if not hasattr(self, '_roboat_pos'):
+         self._roboat_pos = np.zeros((2, ), dtype=float)
+         self._roboat_vel = np.zeros((2, ), dtype=float)
+
+      curr_time = time.time()
+      prev_x, prev_y = self._roboat_pos[0], self._roboat_pos[1]
+      curr_x, curr_y = roboat_state_msg.pose.pose.position.x, roboat_state_msg.pose.pose.position.y
+      self._roboat_pos[0], self._roboat_pos[1] = curr_x, curr_y
+      if hasattr(self, '_roboat_last_update'):
+         self._roboat_vel[0] = (curr_x - prev_x) / (curr_time - self._roboat_last_update)
+         self._roboat_vel[1] = (curr_y - prev_y) / (curr_time - self._roboat_last_update)
+      self._roboat_last_update = curr_time
+
+
+   def shutdown_callback(self):
+      rospy.loginfo('{} was terminated.'.format(self.visual_node_name))
 
 
 if __name__ == '__main__':
@@ -382,8 +339,8 @@ if __name__ == '__main__':
    while not rospy.is_shutdown():
       start_time = time.time()
 
-      curr_positions, pred_positions = node.infer()
-      node.publish(curr_positions, pred_positions)
+      pred_velocities = node.infer()
+      node.publish(pred_velocities)
       
       elapsed = time.time() - start_time
       if elapsed < node.model_args.dt: rospy.sleep(node.model_args.dt - elapsed)
