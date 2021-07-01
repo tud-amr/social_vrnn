@@ -5,7 +5,7 @@ import copy, time, pickle, math, collections
 
 from scipy.spatial.transform import Rotation
 import tensorflow as tf
-import numpy as np
+import numpy as np; np.set_printoptions(suppress=True)
 import cv2
 
 from models.SocialVRNN import NetworkModel as SocialVRNN
@@ -271,13 +271,14 @@ class SocialVRNN_Predictor:
 
       curr_pos, curr_vel = {}, {}
       if hasattr(self, '_roboat_pos'):
-         curr_pos[0], curr_vel[0] = self._roboat_pos, self._roboat_vel
+         curr_pos[0], curr_vel[0] = self._roboat_pos.copy(), self._roboat_vel.copy()
 
       for agent_msg in world_state_msg.lmpcc_obstacles:
          id = int(agent_msg.id)
          # if id > 2: continue # only process small subset (for debugging)
 
          curr_x, curr_y = agent_msg.pose.position.x, agent_msg.pose.position.y
+         if SWITCH_AXES: curr_x, curr_y = curr_y, curr_x
          curr_pos[id] = np.array([curr_x, curr_y], dtype=float)
          if hasattr(self, '_agents_last_update') and id in prev_pos:
             curr_vel[id] = np.array([
@@ -285,11 +286,6 @@ class SocialVRNN_Predictor:
                (curr_y - prev_pos[id][1]) / (curr_time - self._agents_last_update)
             ], dtype=float)
          else: curr_vel[id] = np.zeros((2, ), dtype=float)
-
-      if SWITCH_AXES:
-         for id in curr_pos.keys():
-            curr_pos[id][0], curr_pos[id][1] = curr_pos[id][1], curr_pos[id][0]
-            curr_vel[id][0], curr_vel[id][1] = curr_vel[id][1], curr_vel[id][0]
 
       self.agents_pos, self.agents_vel = curr_pos, curr_vel
       self._agents_last_update = curr_time
@@ -317,6 +313,7 @@ class SocialVRNN_Predictor:
       curr_time = time.time()
       prev_x, prev_y = self._roboat_pos[0], self._roboat_pos[1]
       curr_x, curr_y = roboat_state_msg.pose.pose.position.x, roboat_state_msg.pose.pose.position.y
+      if SWITCH_AXES: curr_x, curr_y = curr_y, curr_x
       self._roboat_pos[0], self._roboat_pos[1] = curr_x, curr_y
       if hasattr(self, '_roboat_last_update'):
          self._roboat_vel[0] = (curr_x - prev_x) / (curr_time - self._roboat_last_update)
