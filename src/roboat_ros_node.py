@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/home/jitske/Documents/roboat_ws/venv/bin/python3.6
 
 import os, sys; print("Running with {}".format(sys.version))
 import copy, time, pickle, math, collections
@@ -17,13 +17,12 @@ from geometry_msgs.msg import Point, PoseStamped
 from visualization_msgs.msg import Marker, MarkerArray
 from social_vrnn.msg import lmpcc_obstacle_array as LMPCC_Obstacle_Array, svrnn_path as SVRNN_Path, svrnn_path_array as SVRNN_Path_Array
 
-print(sys.path)
 sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
 import cv2
 
 PACKAGE_NAME = 'social_vrnn'
 MAX_QUERY_AGENTS = 10
-SWITCH_AXES = True
+SWITCH_AXES = False
 
 
 class SocialVRNN_Predictor:
