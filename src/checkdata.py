@@ -21,7 +21,7 @@ if parentdir not in sys.path: sys.path.insert(0, parentdir)
 from src.data_utils.ProcessTrafficData import mergeSegment, LoadTrafficData, GenerateObsmat, \
     createMap, FilterTraffic
 
-idx_segments = [145, 147, 148, 152]
+idx_segments = [194, 149, 148, 257, 152, 259, 145, 144, 147, 72, 65, 69, 96, 76, 74, 80, 77]
 resolution = [10, 10, .1, np.pi / 48]
 # idx_segments = range(0, 261)
 
@@ -60,14 +60,11 @@ for i in idx_segments:
     else:
         segment = segment.union(segments[i])
 
-print(obsmat[0:50])
-exit()
-
 
 x = obsmat[:, 2]
 y = obsmat[:, 4]
-x = x[3000:5000]
-y = y[3000:5000]
+# x = x[3000:5000]
+# y = y[3000:5000]
 
 fig = plt.figure()
 ax = fig.add_subplot(111)

@@ -1,12 +1,12 @@
-from src.data_utils.ProcessTrafficData import *
+from data_utils.ProcessTrafficData import *
 import pathlib
 
 buf = -5.0  # the canal segment map to add safety margin in path planning
 resolution = [10, 10, .1, np.pi / 40]
 
 # idx_segments = [152]
-idx_segments = [145, 147, 148, 152]
-# idx_segments = range(0, 261)
+# idx_segments = [145, 147, 148, 152]
+idx_segments = [194, 149, 148, 257, 152, 259, 145, 144, 147, 72, 65, 69, 96, 76, 74, 80, 77]
 
 path = pathlib.Path(__file__).parent.parent.absolute()
 data_path = path / 'data/real_world/amsterdam_canals'
