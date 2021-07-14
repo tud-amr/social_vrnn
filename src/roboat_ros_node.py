@@ -55,7 +55,7 @@ class SocialVRNN_Predictor:
       self.marker_template = mrk
 
       # Load the model
-      self.model_args = self.get_model_args('SocialVRNN', '500')
+      self.model_args = self.get_model_args('SocialVRNN', '666')
       self.model, self.tf_session = self.load_model(SocialVRNN, self.model_args)
 
       # Set up subscribers
