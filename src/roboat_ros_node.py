@@ -21,7 +21,7 @@ sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
 import cv2
 
 PACKAGE_NAME = 'social_vrnn'
-MAX_QUERY_AGENTS = 10
+MAX_QUERY_AGENTS = 100
 SWITCH_AXES = False
 
 
