@@ -1,7 +1,6 @@
 import pathlib
 
 import matplotlib.pyplot as plt
-import cv2
 import sqlite3
 import pickle
 import numpy as np
@@ -21,6 +20,9 @@ if parentdir not in sys.path: sys.path.insert(0, parentdir)
 from src.data_utils.ProcessTrafficData import mergeSegment, LoadTrafficData, GenerateObsmat, \
     createMap, FilterTraffic
 
+sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
+import cv2
+
 idx_segments = [145, 147, 148, 152]
 resolution = [10, 10, .1, np.pi / 48]
 # idx_segments = range(0, 261)
@@ -34,7 +36,7 @@ dataset = data_path / 'traffic_data.sqlite3'
 segment = mergeSegment(idx_segments, map_path)
 
 time_from = datetime(2017, 8, 12, 13)
-time_to = datetime(2017, 8, 12, 14)
+time_to = datetime(2017, 8, 15, 14)
 
 traffic_data_raw = LoadTrafficData(dataset, segment, time_from, time_to)
 traffic_data_filtered = FilterTraffic(traffic_data_raw, segment, resolution)
@@ -60,14 +62,12 @@ for i in idx_segments:
     else:
         segment = segment.union(segments[i])
 
-print(obsmat[0:50])
-exit()
-
 
 x = obsmat[:, 2]
 y = obsmat[:, 4]
-x = x[3000:5000]
-y = y[3000:5000]
+# print(x)
+# x = x[3000:5000]
+# y = y[3000:5000]
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
@@ -85,4 +85,10 @@ plt.gca().set_aspect('equal')
 # plt.axis("off")
 plt.tight_layout()
 
+fig_save = data_path / 'check.png'
+print("Save figure: ")
+print(fig_save)
+plt.savefig(fig_save)
+
 plt.show()
+
