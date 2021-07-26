@@ -3,6 +3,8 @@ from datetime import datetime
 import sqlite3
 import pickle
 import numpy as np
+import csv
+import os
 from PIL import Image
 from matplotlib import pyplot as plt
 from descartes import PolygonPatch
@@ -192,6 +194,50 @@ def GenerateObsmat(traffic_data, data_path, save=True):
     obsmat = obsmat[obsmat[:, 0].argsort()]
     if save:
         np.savetxt(data_path / 'obsmat.txt', obsmat, fmt='%e')
+
+    return obsmat
+
+def GenerateCSV(traffic_data, data_path, save=True):
+    """
+    Convert filtered traffic data into a csv format and save.
+    """
+
+    basetime = datetime(year=2017, month=8, day=12)
+    obsmat = None
+
+    if os.path.isfile(data_path / 'dynamicobstacles.csv'):
+        os.remove(data_path / 'dynamicobstacles.csv')
+
+    with open(data_path / 'dynamicobstacles.csv', mode='w') as csv_file:
+        csv_writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        csv_writer.writerow(["dt", "key", "x", "y", "th", "vx", "vy", "w", "dim_1", "dim_2"])
+
+        for key in traffic_data.keys():
+            dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data[key])
+
+            # shiftx = np.roll(x, -1)
+            # shifty = np.roll(y, -1)
+            # vx = shiftx - x
+            # vy = shifty - y
+            # vx[-1] = 0
+            # vy[-1] = 0
+
+            keys = np.full_like(x, fill_value=key)
+            zeros = np.zeros_like(x)
+            frames = [int((date - basetime).total_seconds()) for date in dt]
+
+            if obsmat is None:
+                obsmat = np.vstack((frames, keys, x, y, th, vx, vy, w, dim_1, dim_2)).transpose()
+            else:
+                stacked = np.vstack((frames, keys, x, y, th, vx, vy, w, dim_1, dim_2)).transpose()
+                obsmat = np.vstack((obsmat, stacked))
+
+        obsmat = obsmat[obsmat[:, 0].argsort()]
+
+        for row in obsmat:
+            csv_writer.writerow([row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9]])
+
+    print(".csv file generated")
 
     return obsmat
 

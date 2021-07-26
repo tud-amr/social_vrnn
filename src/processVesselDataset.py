@@ -18,7 +18,7 @@ dataset = data_path / 'traffic_data.sqlite3'
 segment = mergeSegment(idx_segments, map_path)
 
 time_from = datetime(2017, 8, 12, 13)
-time_to = datetime(2017, 8, 15, 14)
+time_to = datetime(2017, 8, 12, 14)
 
 traffic_data_raw = LoadTrafficData(dataset, segment, time_from, time_to)
 print("Traffic data loaded")
@@ -26,13 +26,13 @@ traffic_data_filtered = FilterTraffic(traffic_data_raw, segment, resolution)
 print("Data filtered")
 obsmat = GenerateObsmat(traffic_data_filtered, data_path, save=True)
 print("Obsmat done")
+GenerateCSV(traffic_data_filtered, data_path, save=True)
+print("Generated CSV")
 createMap(idx_segments, data_path)
 
-exit()
+# exit()
 
-
-canal_map = '/home/jitske/Documents/Dataset/canal_map'
-with open(canal_map, 'rb') as file_pickle:
+with open(map_path, 'rb') as file_pickle:
     segments = pickle.load(file_pickle)
 
 segment = None
