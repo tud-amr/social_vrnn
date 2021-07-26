@@ -20,17 +20,19 @@ segment = mergeSegment(idx_segments, map_path)
 time_from = datetime(2017, 8, 12, 13)
 time_to = datetime(2017, 8, 12, 14)
 
+print("Loading traffic data")
 traffic_data_raw = LoadTrafficData(dataset, segment, time_from, time_to)
-print("Traffic data loaded")
+print("Filtering data")
 traffic_data_filtered = FilterTraffic(traffic_data_raw, segment, resolution)
-print("Data filtered")
+print("Generating Obsmat")
 obsmat = GenerateObsmat(traffic_data_filtered, data_path, save=True)
-print("Obsmat done")
+print("Generating CSV")
 GenerateCSV(traffic_data_filtered, data_path, save=True)
-print("Generated CSV")
+print("Creating map")
 createMap(idx_segments, data_path)
 
 # exit()
+print("Creating map with all the segments for validation of data")
 
 with open(map_path, 'rb') as file_pickle:
     segments = pickle.load(file_pickle)
@@ -73,5 +75,9 @@ plt.show()
 fig.savefig('map.png', dpi=400, bbox_inches='tight',
             pad_inches=0)
 
+fig_save = data_path / 'check.png'
+print("Save figure: ")
+print(fig_save)
+plt.savefig(fig_save)
 
 createMap(idx_segments, data_path)

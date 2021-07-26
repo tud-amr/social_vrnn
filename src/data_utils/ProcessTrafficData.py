@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import csv
 import os
+from tqdm import tqdm
 from PIL import Image
 from matplotlib import pyplot as plt
 from descartes import PolygonPatch
@@ -53,7 +54,7 @@ def LoadTrafficData(dataset_path, segment, time_from, time_to):
         [x_min - 50, x_max + 50, y_min - 50, y_max + 50, time_from, time_to])
 
     traffic_data = {}
-    for data in cur.fetchall():
+    for data in tqdm(cur.fetchall()):
         key = str(data[0])
 
         if key in traffic_data.keys():
@@ -112,7 +113,7 @@ def FilterTraffic(traffic_data_raw, segment, resolution):
     """
     n = 0
     traffic_data_filtered = {}
-    for key in traffic_data_raw.keys():
+    for key in tqdm(traffic_data_raw.keys()):
         dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data_raw[key])
 
         idx = [i for i, tmp_dt in enumerate(np.diff(dt)) if tmp_dt.seconds > 1]
@@ -172,7 +173,7 @@ def GenerateObsmat(traffic_data, data_path, save=True):
     basetime = datetime(year=2017, month=8, day=12)
     obsmat = None
 
-    for key in traffic_data.keys():
+    for key in tqdm(traffic_data.keys()):
         dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data[key])
 
         shiftx = np.roll(x, -1)
@@ -212,7 +213,7 @@ def GenerateCSV(traffic_data, data_path, save=True):
         csv_writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         csv_writer.writerow(["dt", "key", "x", "y", "th", "vx", "vy", "w", "dim_1", "dim_2"])
 
-        for key in traffic_data.keys():
+        for key in tqdm(traffic_data.keys()):
             dt, x, y, th, vx, vy, w, dim_1, dim_2 = zip(*traffic_data[key])
 
             # shiftx = np.roll(x, -1)
