@@ -1,4 +1,4 @@
-from src.data_utils.ProcessTrafficData import *
+from data_utils.ProcessTrafficData import *
 import pathlib
 
 buf = -5.0  # the canal segment map to add safety margin in path planning
@@ -18,7 +18,7 @@ dataset = data_path / 'traffic_data.sqlite3'
 segment = mergeSegment(idx_segments, map_path)
 
 time_from = datetime(2017, 8, 12, 13)
-time_to = datetime(2017, 8, 12, 14)
+time_to = datetime(2017, 8, 15, 14)
 
 traffic_data_raw = LoadTrafficData(dataset, segment, time_from, time_to)
 print("Traffic data loaded")
@@ -31,7 +31,7 @@ createMap(idx_segments, data_path)
 exit()
 
 
-canal_map = '/Users/tuhindas/Documents/Tuhin/Computer Science/Year 3/Roboat/social_vrnn/data/real_world/amsterdam_canals/canal_map'
+canal_map = '/home/jitske/Documents/Dataset/canal_map'
 with open(canal_map, 'rb') as file_pickle:
     segments = pickle.load(file_pickle)
 
@@ -70,8 +70,8 @@ plt.gca().set_aspect('equal')
 plt.tight_layout()
 plt.show()
 
-# fig.savefig('map.png', dpi=400, bbox_inches='tight',
-#             pad_inches=0)
+fig.savefig('map.png', dpi=400, bbox_inches='tight',
+            pad_inches=0)
 
 
-# createMap(idx_segments, data_path)
+createMap(idx_segments, data_path)
