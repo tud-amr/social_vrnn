@@ -196,7 +196,7 @@ def GenerateObsmat(traffic_data, data_path, save=True):
     return obsmat
 
 
-def createMap(idx_segments, data_path, dpi=40):
+def createMap(idx_segments, data_path, dpi=150):
     canal_map = data_path / 'canal_map'
     with open(canal_map, 'rb') as file_pickle:
         segments = pickle.load(file_pickle)
