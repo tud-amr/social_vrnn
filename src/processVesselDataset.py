@@ -72,7 +72,7 @@ plt.gca().set_aspect('equal')
 plt.tight_layout()
 plt.show()
 
-fig.savefig('map.png', dpi=400, bbox_inches='tight',
+fig.savefig('map.png', dpi=100, bbox_inches='tight',
             pad_inches=0)
 
 fig_save = data_path / 'check.png'
