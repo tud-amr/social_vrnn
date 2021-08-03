@@ -1,7 +1,6 @@
 import pathlib
 
 import matplotlib.pyplot as plt
-import cv2
 import sqlite3
 import pickle
 import numpy as np
@@ -21,6 +20,10 @@ if parentdir not in sys.path: sys.path.insert(0, parentdir)
 from src.data_utils.ProcessTrafficData import mergeSegment, LoadTrafficData, GenerateObsmat, \
     createMap, FilterTraffic
 
+sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
+import cv2
+
+# idx_segments = [145, 147, 148, 152]
 idx_segments = [194, 149, 148, 257, 152, 259, 145, 144, 147, 72, 65, 69, 96, 76, 74, 80, 77]
 resolution = [10, 10, .1, np.pi / 48]
 # idx_segments = range(0, 261)
@@ -81,5 +84,10 @@ plt.scatter(x, y, color='limegreen', marker='.', s=5)
 plt.gca().set_aspect('equal')
 # plt.axis("off")
 plt.tight_layout()
+
+fig_save = data_path / 'check.png'
+print("Save figure: ")
+print(fig_save)
+plt.savefig(fig_save)
 
 plt.show()

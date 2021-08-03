@@ -3,7 +3,7 @@ import sys
 if sys.version_info[0] < 3:
   from models.tf_utils import *
 else:
-  from src.models.tf_utils import *
+  from models.tf_utils import *
 
 class VariationalRNNCell(tf.contrib.rnn.RNNCell):
     """Variational RNN cell."""

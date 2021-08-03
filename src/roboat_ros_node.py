@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/home/jitske/Documents/roboat_ws/venv/bin/python3.6
 
 import os, sys; print("Running with {}".format(sys.version))
 import copy, time, pickle, math, collections
@@ -6,7 +6,6 @@ import copy, time, pickle, math, collections
 from scipy.spatial.transform import Rotation
 import tensorflow as tf
 import numpy as np; np.set_printoptions(suppress=True)
-import cv2
 
 from models.SocialVRNN import NetworkModel as SocialVRNN
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
@@ -18,9 +17,12 @@ from geometry_msgs.msg import Point, PoseStamped
 from visualization_msgs.msg import Marker, MarkerArray
 from social_vrnn.msg import lmpcc_obstacle_array as LMPCC_Obstacle_Array, svrnn_path as SVRNN_Path, svrnn_path_array as SVRNN_Path_Array
 
+sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
+import cv2
+
 PACKAGE_NAME = 'social_vrnn'
-MAX_QUERY_AGENTS = 10
-SWITCH_AXES = True
+MAX_QUERY_AGENTS = 100
+SWITCH_AXES = False
 
 
 class SocialVRNN_Predictor:
@@ -46,14 +48,14 @@ class SocialVRNN_Predictor:
       mrk = Marker()
       mrk.header.frame_id = 'odom'
       mrk.action = Marker.ADD
-      mrk.lifetime.secs = 1.0
+      mrk.lifetime.secs = int(1.0)
       mrk.scale.x, mrk.scale.y, mrk.scale.z = 1.0, 1.0, 1.0
       mrk.color.r, mrk.color.g, mrk.color.b, mrk.color.a = 1.0, 1.0, 1.0, 1.0
       mrk.pose.orientation.w = 1.0
       self.marker_template = mrk
 
       # Load the model
-      self.model_args = self.get_model_args('SocialVRNN', '500')
+      self.model_args = self.get_model_args('SocialVRNN', '666')
       self.model, self.tf_session = self.load_model(SocialVRNN, self.model_args)
 
       # Set up subscribers
@@ -157,9 +159,10 @@ class SocialVRNN_Predictor:
                idx = ts_id * self.model_args.output_pred_state_dim * self.model_args.n_mixtures + mx_id
                pt.x = prev_x + self.model_args.dt * pred[0][idx + (self.model_args.n_mixtures if SWITCH_AXES else 0)]
                pt.y = prev_y + self.model_args.dt * pred[0][idx + (0 if SWITCH_AXES else self.model_args.n_mixtures)]
-               path_mrk.points.append(pt)
                pose.pose.position = pt
                path_msg.path.poses.append(pose)
+               pt.z = 0.2
+               path_mrk.points.append(pt)
                prev_x, prev_y = pt.x, pt.y
             pred_velocities_mrk.markers.append(path_mrk)
          pred_velocities_path.paths.append(path_msg)
@@ -294,7 +297,7 @@ class SocialVRNN_Predictor:
       curr_positions_mrk = MarkerArray()
       for id, pos in self.agents_pos.items():
          ag_mrk = copy.deepcopy(self.marker_template)
-         ag_mrk.id = id
+         ag_mrk.id = int(id)
          ag_mrk.type = Marker.SPHERE
          ag_mrk.color.r = float(id % 3 == 0)
          ag_mrk.color.g = float(id % 3 == 1)

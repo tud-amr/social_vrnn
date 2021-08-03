@@ -20,19 +20,21 @@ segment = mergeSegment(idx_segments, map_path)
 time_from = datetime(2017, 8, 12, 13)
 time_to = datetime(2017, 8, 12, 14)
 
+print("Loading traffic data")
 traffic_data_raw = LoadTrafficData(dataset, segment, time_from, time_to)
-print("Traffic data loaded")
+print("Filtering data")
 traffic_data_filtered = FilterTraffic(traffic_data_raw, segment, resolution)
-print("Data filtered")
+print("Generating Obsmat")
 obsmat = GenerateObsmat(traffic_data_filtered, data_path, save=True)
-print("Obsmat done")
+print("Generating CSV")
+GenerateCSV(traffic_data_filtered, data_path, save=True)
+print("Creating map")
 createMap(idx_segments, data_path)
 
-exit()
+# exit()
+print("Creating map with all the segments for validation of data")
 
-
-canal_map = '/Users/tuhindas/Documents/Tuhin/Computer Science/Year 3/Roboat/social_vrnn/data/real_world/amsterdam_canals/canal_map'
-with open(canal_map, 'rb') as file_pickle:
+with open(map_path, 'rb') as file_pickle:
     segments = pickle.load(file_pickle)
 
 segment = None
@@ -70,8 +72,12 @@ plt.gca().set_aspect('equal')
 plt.tight_layout()
 plt.show()
 
-# fig.savefig('map.png', dpi=400, bbox_inches='tight',
-#             pad_inches=0)
+fig.savefig('map.png', dpi=100, bbox_inches='tight',
+            pad_inches=0)
 
+fig_save = data_path / 'check.png'
+print("Save figure: ")
+print(fig_save)
+plt.savefig(fig_save)
 
-# createMap(idx_segments, data_path)
+createMap(idx_segments, data_path)
