@@ -143,6 +143,7 @@ class SocialVRNN_Predictor:
          path_msg.id = float(id)
          path_msg.dt = self.model_args.dt
          for mx_id in range(self.model_args.n_mixtures):
+            main_mixture = mx_id == 0
             path_mrk = copy.deepcopy(self.marker_template)
             path_mrk.id = self.model_args.n_mixtures * id + mx_id
             path_mrk.type = Marker.LINE_STRIP
@@ -160,7 +161,7 @@ class SocialVRNN_Predictor:
                pt.x = prev_x + self.model_args.dt * pred[0][idx + (self.model_args.n_mixtures if SWITCH_AXES else 0)]
                pt.y = prev_y + self.model_args.dt * pred[0][idx + (0 if SWITCH_AXES else self.model_args.n_mixtures)]
                pose.pose.position = pt
-               path_msg.path.poses.append(pose)
+               if main_mixture: path_msg.path.poses.append(pose)
                pt.z = 0.2
                path_mrk.points.append(pt)
                prev_x, prev_y = pt.x, pt.y
