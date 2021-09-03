@@ -218,7 +218,7 @@ class NetworkModel():
                         # Reusing weights for each truncated back propagation step
                         for t_idx in range(len(dec_fc_layer)):
                             dec_output_layer.append(linear(dec_fc_layer[t_idx], self.output_vec_dim, 50))
-                            dec_pi_series.append(linear(dec_fc_layer[t_idx], self.args.n_mixtures, 100))
+                            dec_pi_series.append(linear(tf.stop_gradient(dec_fc_layer[t_idx], self.args.n_mixtures, 100)))
                         for t_idx in range(len(dec_output_layer)):
                             m_x, m_y, s_x, s_y = tf.split(dec_output_layer[t_idx], 4, axis=1)
                             dec_mux_series.append(m_x)
