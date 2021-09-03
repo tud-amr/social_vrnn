@@ -556,7 +556,7 @@ class DataHandlerLSTM():
 		# Dynamically set occupancy grid size
 		og_x_size = (br_rw-tl_rw)[0, 0]
 		og_y_size = (tl_rw-br_rw)[1, 0]
-		self.agent_container.occupancy_grid.map_size = np.array([og_x_size, og_y_size])  # map size in meters, [0] = x (→), [1] = y (↑)
+		self.agent_container.occupancy_grid.map_size = np.array([og_x_size, og_y_size])  # map size in meters, [0] = x (>), [1] = y (^)
 		self.agent_container.occupancy_grid.center = self.agent_container.occupancy_grid.map_size / 2.0
 
 		gridmap_us = cv2.resize(
@@ -816,7 +816,7 @@ class DataHandlerLSTM():
 		print("Loading data from: '{}'".format(load_path))
 		self.file = open(load_path, 'rb')
 		if sys.version_info[0] < 3:
-			tmp_self = pkl.loads(self.file)#,encoding='latin1')
+			tmp_self = pkl.load(self.file)
 		else:
 			tmp_self = pkl.load(self.file , encoding='latin1')
 		self.trajectory_set = tmp_self["trajectories"]

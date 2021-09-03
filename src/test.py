@@ -134,7 +134,8 @@ if args.normalize_data:
 	data_prep.compute_min_max_values()
 
 # Import model
-module = importlib.import_module("src.models." + args.model_name)
+if sys.version_info[0] < 3: module = importlib.import_module("models." + args.model_name)
+else: module = importlib.import_module("src.models." + args.model_name)
 globals().update(module.__dict__)
 
 model = NetworkModel(args)
@@ -309,8 +310,9 @@ if test_args.record:
 		print("Real data!!")
 		# recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list, trajectories,test_args)
 		plotargs = (input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list, trajectories, test_args)
-		try: Plotter.generate_zoom_plot(recorder.args, *plotargs, all_traj_likelihood)
-		except: pass
+		# PYTHON2 COMMENT
+		# try: Plotter.generate_zoom_plot(recorder.args, *plotargs, all_traj_likelihood)
+		# except: pass
 		try: recorder.plot_on_image(input_list, grid_list, all_predictions, y_ground_truth_list, other_agents_list,
 			                       trajectories,test_args, all_traj_likelihood)
 		except: pass

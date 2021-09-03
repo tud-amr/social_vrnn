@@ -2,12 +2,11 @@ from tensorflow_probability import distributions as tfd
 import sys
 
 if sys.version_info[0] < 3:
-    sys.path.append('../src/external')
-    from vrnn_cell import VariationalRNNCell as vrnn_cell
-    from tf_utils import *
+    from cells.vrnn_cell import VariationalRNNCell as vrnn_cell
+    from models.tf_utils import *
 else:
-    from src.cells.vrnn_cell import VariationalRNNCell as vrnn_cell
-    from src.models.tf_utils import *
+    from cells.vrnn_cell import VariationalRNNCell as vrnn_cell
+    from models.tf_utils import *
 import numpy as np
 import os
 from colorama import Fore, Style
@@ -422,6 +421,30 @@ class NetworkModel():
                 self.cell_state_lstm_concat: self.test_cell_state_current_lstm_concat,
                 self.hidden_state_lstm_concat: self.test_hidden_state_current_lstm_concat,
                 }
+
+
+    def feed_pred_dic(self, **kwargs):
+        step = kwargs["step"]
+        n_other_agents = np.zeros([self.args.batch_size])
+
+        return {self.input_state_placeholder: np.expand_dims(kwargs["batch_vel"], axis=1),
+                self.input_ped_grid_placeholder: np.expand_dims(kwargs["batch_ped_grid"], axis=1),
+                self.input_grid_placeholder: np.expand_dims(kwargs["batch_grid"], axis=1),
+                self.step: 0,
+                self.seq_length: n_other_agents,
+                self.cell_state: self.test_cell_state_current,
+                self.hidden_state: self.test_hidden_state_current,
+                self.cell_state_lstm_grid: self.test_cell_state_current_lstm_grid,
+                self.hidden_state_lstm_grid: self.test_hidden_state_current_lstm_grid,
+                self.cell_state_lstm_ped: self.test_cell_state_current_lstm_ped,
+                self.hidden_state_lstm_ped: self.test_hidden_state_current_lstm_ped,
+                self.cell_state_lstm_concat: self.test_cell_state_current_lstm_concat,
+                self.hidden_state_lstm_concat: self.test_hidden_state_current_lstm_concat,
+                # self.initial_position_placeholder: np.repeat(np.expand_dims(np.expand_dims(kwargs["batch_pos"], axis=1), axis=1),self.args.n_mixtures,axis=2),
+                # self.initial_velocity_placeholder: np.repeat(np.expand_dims(np.expand_dims(kwargs["batch_initial_vel"], axis=1), axis=1), self.args.n_mixtures, axis=2),
+                # self.initial_sigma_placeholder: np.repeat(np.expand_dims(np.expand_dims(kwargs["batch_initial_uncertainty"], axis=1), axis=1), self.args.n_mixtures, axis=2),
+                }
+
 
     def feed_val_dic(self, n_other_agent = None, **kwargs):
         n_other_agents = np.zeros([self.args.batch_size])

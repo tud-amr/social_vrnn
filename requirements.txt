@@ -3,7 +3,7 @@ numpy
 tensorflow==1.15.0
 tensorflow_probability==0.7.0
 colorama
-matplotlib==3.3.3
+matplotlib
 progressbar
 opencv-python
 pykalman
