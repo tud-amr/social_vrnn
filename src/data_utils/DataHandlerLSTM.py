@@ -934,8 +934,8 @@ class DataHandlerLSTM():
 					rel_pos = np.array([other_poses_ordered[ag_id,0] - current_pos[0],other_poses_ordered[ag_id, 1] - current_pos[1]])
 					rel_vel = np.array([other_poses_ordered[ag_id,2] - current_vel[0],other_poses_ordered[ag_id, 3] - current_vel[1]])
 
-					pedestrian_grid[batch_idx, tbp_step, ag_id*self.pedestrian_vector_dim:ag_id*self.pedestrian_vector_dim+self.pedestrian_vector_dim] = np.concatenate([rel_pos, rel_vel])
-					#pedestrian_grid[batch_idx, tbp_step, ag_id*self.pedestrian_vector_dim:ag_id*self.pedestrian_vector_dim+self.pedestrian_vector_dim] = np.concatenate([rel_pos, rel_vel,np.array([np.linalg.norm(rel_pos),np.arctan2(rel_pos[1], rel_pos[0])])])
+					#pedestrian_grid[batch_idx, tbp_step, ag_id*self.pedestrian_vector_dim:ag_id*self.pedestrian_vector_dim+self.pedestrian_vector_dim] = np.concatenate([rel_pos, rel_vel])
+					pedestrian_grid[batch_idx, tbp_step, ag_id*self.pedestrian_vector_dim:ag_id*self.pedestrian_vector_dim+self.pedestrian_vector_dim] = np.concatenate([rel_pos, rel_vel,np.array([np.linalg.norm(rel_pos),np.arctan2(rel_pos[1], rel_pos[0])])])
 
 
 			elif self.args.others_info == "angular_grid":

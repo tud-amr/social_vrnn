@@ -100,7 +100,7 @@ class NetworkModel():
     self.hidden_state_lstm_concat = tf.placeholder(dtype=tf.float32, shape=[None, self.rnn_state_size_lstm_concat], name='hidden_state_lstm_concat')  # output of the cell (after output gate)
     self.init_state_tuple_lstm_concat = tf.contrib.rnn.LSTMStateTuple(self.cell_state_lstm_concat, self.hidden_state_lstm_concat)
 
-    inputs_series = tf.unstack(self.input_state_placeholder, axis=1)
+    inputs_series = tf.unstack(tf.contrib.layers.layer_norm(self.input_state_placeholder), axis=1)
     outputs_series = tf.unstack(self.output_placeholder, axis=1)
     
     # Print network info
@@ -143,7 +143,7 @@ class NetworkModel():
                                                                                                        initial_state=self.init_state_tuple_lstm_grid)
 
         # Process pedestrian grid
-        ped_grid_series = tf.unstack(self.input_ped_grid_placeholder, axis=1)
+        ped_grid_series = tf.unstack(tf.contrib.layers.layer_norm(self.input_ped_grid_placeholder), axis=1)
         # Embedding layer of pedestrian grid
         ped_grid_feature_series = self.process_pedestrian_grid(ped_grid_series)
 
@@ -160,7 +160,7 @@ class NetworkModel():
         # Concatenate the outputs of the three previous LSTMs and feed in first concatenated LSTM cell
         concat_lstm = []
         for lstm_out, grid_feature, ped_feature in zip(self.cell_outputs_series_state, self.cell_outputs_series_lstm_grid, self.cell_outputs_series_lstm_ped):
-          concat_lstm.append(tf.concat([lstm_out, grid_feature, ped_feature], axis=1, name="concatenate_lstm_out_with_grid_and_ped"))
+          concat_lstm.append(tf.contrib.layers.layer_norm(tf.concat([lstm_out, grid_feature, ped_feature], axis=1, name="concatenate_lstm_out_with_grid_and_ped")))
 
       # Concatenated LSTM layer
       with tf.variable_scope('generation_model') as scope:
@@ -311,6 +311,24 @@ class NetworkModel():
             self.hidden_state: np.random.normal(self.test_hidden_state_current.copy(),kwargs["state_noise"]),
             self.cell_state_lstm_grid: np.random.normal(self.test_cell_state_current_lstm_grid.copy(),kwargs["grid_noise"]),
             self.hidden_state_lstm_grid: np.random.normal(self.test_hidden_state_current_lstm_grid.copy(),kwargs["grid_noise"]),
+            self.cell_state_lstm_ped: self.test_cell_state_current_lstm_ped,
+            self.hidden_state_lstm_ped: self.test_hidden_state_current_lstm_ped,
+            self.cell_state_lstm_concat: self.test_cell_state_current_lstm_concat,
+            self.hidden_state_lstm_concat: self.test_hidden_state_current_lstm_concat,
+            }
+
+  def feed_pred_dic(self, **kwargs):
+    step = kwargs["step"]
+    n_other_agents = np.zeros([self.args.batch_size])
+
+    return {self.input_state_placeholder: np.expand_dims(kwargs["batch_vel"], axis=1),
+            self.input_ped_grid_placeholder: np.expand_dims(kwargs["batch_ped_grid"], axis=1),
+            self.input_grid_placeholder: np.expand_dims(kwargs["batch_grid"], axis=1),
+            self.step: 0,
+            self.cell_state: self.test_cell_state_current,
+            self.hidden_state: self.test_hidden_state_current,
+            self.cell_state_lstm_grid: self.test_cell_state_current_lstm_grid,
+            self.hidden_state_lstm_grid: self.test_hidden_state_current_lstm_grid,
             self.cell_state_lstm_ped: self.test_cell_state_current_lstm_ped,
             self.hidden_state_lstm_ped: self.test_hidden_state_current_lstm_ped,
             self.cell_state_lstm_concat: self.test_cell_state_current_lstm_concat,

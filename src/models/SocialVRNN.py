@@ -101,7 +101,7 @@ class NetworkModel():
 		self.hidden_state_lstm_concat = tf.placeholder(dtype=tf.float32, shape=[None, self.rnn_state_size_lstm_concat],name='hidden_state_lstm_concat')  # output of the cell (after output gate)
 		self.init_state_tuple_lstm_concat = tf.contrib.rnn.LSTMStateTuple(self.cell_state_lstm_concat,self.hidden_state_lstm_concat)
 
-		inputs_series = tf.unstack(self.input_state_placeholder, axis=1)
+		inputs_series = tf.unstack(tf.contrib.layers.layer_norm(self.input_state_placeholder), axis=1)
 		outputs_series = tf.unstack(self.output_placeholder, axis=1)
 
 		# Print network info
@@ -137,7 +137,7 @@ class NetworkModel():
 					                                                                                             initial_state=self.init_state_tuple_lstm_grid)
 
 				# Process pedestrian grid
-				ped_grid_series = tf.unstack(self.input_ped_grid_placeholder, axis=1)
+				ped_grid_series = tf.unstack(tf.contrib.layers.layer_norm(self.input_ped_grid_placeholder), axis=1)
 				# Embedding layer of pedestrian grid
 				ped_grid_feature_series = self.process_pedestrian_grid(ped_grid_series)
 
