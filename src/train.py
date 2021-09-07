@@ -88,7 +88,7 @@ max_range_ped_grid = 5
 
 print_freq = 200
 save_freq = 500
-total_training_steps = 20000
+total_training_steps = 5000
 dt = 0.1
 
 warmstart_model = False
@@ -433,7 +433,6 @@ with tf.Session(config=config) as sess:
         avg_loop_time = time.time() - start_time_loop
 
         training_loss.append(model_output["batch_loss"])
-        likelihood_loss.append(model_output["likelihood loss"])
 
         if step == 1:
             avg_training_loss *= model_output["batch_loss"]
@@ -457,9 +456,8 @@ with tf.Session(config=config) as sess:
             ellapsed_time = time.time() - start_time
 
             print(
-                Fore.BLUE + "\n\nEpoch {:d}, Steps: {:d}, Train loss: {:01.2f}, Validation loss: {:01.2f}, Likelihood loss: {:01.2f}, Epoch time: {:01.2f} sec"
-                .format(epoch + 1, step, np.mean(avg_training_loss), validation_loss,
-                        np.mean(likelihood_loss), ellapsed_time) + Style.RESET_ALL)
+                Fore.BLUE + "\n\nEpoch {:d}, Steps: {:d}, Train loss: {:01.2f}, Validation loss: {:01.2f}, Epoch time: {:01.2f} sec"
+                .format(epoch + 1, step, np.mean(avg_training_loss), validation_loss,ellapsed_time) + Style.RESET_ALL)
 
             if tensorboard_logging:
                 model.summary_writer.add_summary(model_output["summary"], step)

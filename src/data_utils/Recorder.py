@@ -1364,8 +1364,6 @@ class Recorder():
 							center = (int(obsv_XY[0, 1]*scale_factor), int(obsv_XY[0, 0]*scale_factor))
 							cv2.ellipse(overlay, center, (5, 5), 0, 0, 360, (153, 153, 51), -1)
 
-					traj_likelihood = traj_likelihoods[animation_idx]
-					likelihoods = traj_likelihood[step].flatten()
 					font = cv2.FONT_HERSHEY_SIMPLEX
 					# PYTHON2 COMMENT
 					# cv2.putText(overlay, f"{likelihoods[0]:.2f}", (10, 25), font, 0.5, colors[0], 2)

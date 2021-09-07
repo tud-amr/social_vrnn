@@ -244,11 +244,6 @@ with tf.Session(config=config) as sess:
 
 			y_model_pred, likelihood = model.predict(sess, feed_dict_, True)
 
-			# Backup cell states for later analysis
-			cell_state_list.append(model.test_cell_state_current[0, :])
-			# cell_ped_list.append(model.test_cell_state_current_lstm_ped[0, :])
-			cell_concat_list.append(model.test_cell_state_current_lstm_concat[0, :])
-
 			# Rotate predictions to global frame
 			if args.rotated_grid:
 				heading = math.atan2(batch_vel[0, step, 1], batch_vel[0, step, 0])

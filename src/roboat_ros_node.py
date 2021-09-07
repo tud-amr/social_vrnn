@@ -109,7 +109,7 @@ class SocialVRNN_Predictor:
          nn_vel -= agents_vel_np[sub_ind]
 
          # Set relative odometry vector
-         relative_odometry[sub_ind] = np.concatenate((nn_pos, nn_vel), axis=1).flatten()
+         relative_odometry[sub_ind] = np.concatenate((nn_pos, nn_vel,np.linalg.norm(nn_pos),np.arctan2(nn_pos[1], nn_pos[0])), axis=1).flatten()
 
       # Get the submaps
       submaps = np.zeros((MAX_QUERY_AGENTS, self.model_args.submap_width, self.model_args.submap_height), dtype=float)
