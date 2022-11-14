@@ -868,8 +868,8 @@ class DataHandlerLSTM():
 			for prev_step in range(self.prev_horizon,-1,-1):
 				current_pos = np.array([trajectory.pose_vec[start_idx + tbp_step - prev_step, 0], trajectory.pose_vec[
 					                        start_idx + tbp_step - prev_step, 1]])
-				current_vel = np.array([trajectory.vel_vec[start_idx + tbp_step, 0], trajectory.vel_vec[
-					                        start_idx + tbp_step - prev_step - prev_step, 1]])
+				current_vel = np.array([trajectory.vel_vec[start_idx + tbp_step - prev_step, 0], trajectory.vel_vec[
+					                        start_idx + tbp_step - prev_step, 1]])
 
 				if self.args.normalize_data:
 					self.normalize_pos(current_pos)
