@@ -170,11 +170,15 @@ with tf.Session(config=config) as sess:
 	except:
 		print("")
 
-	for exp_id in range(np.minimum(test_args.num_test_sequences, len(data_prep.trajectory_set) - 1)):
+	test_traj_ids = range(int(len(data_prep.trajectory_set) * data_prep.train_set), len(data_prep.trajectory_set))
+
+	if test_args.record:
+		test_traj_ids = test_traj_ids[:test_args.num_test_sequences]
+
+	for traj_id in test_traj_ids:
 		predictions = []
 		traj_likelihood = []
-		# sample a trajectory id for testing
-		traj_id = random.randint(0, len(data_prep.trajectory_set) - 1)
+
 		batch_x, batch_vel, batch_pos, batch_goal, batch_grid, other_agents_info, batch_target, batch_end_pos, other_agents_pos, traj = data_prep.getTrajectoryAsBatch(
 			traj_id, freeze=test_args.freeze_other_agents)  # trajectory_set random.randint(0, len(data_prep.dataset) - 1)
 
