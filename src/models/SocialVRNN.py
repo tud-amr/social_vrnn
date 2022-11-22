@@ -357,7 +357,13 @@ class NetworkModel():
 	def feed_dic(self, **kwargs):
 		if self.args.rotated_grid:
 			batch_x, batch_y = sup.rotate_batch_to_local_frame(kwargs['batch_y'], kwargs['batch_x'])
-			batch_x = batch_x[:, :, 2:]
+
+			# recreating batch_vel from batch_x (note that batch_x acts as batch_vel in the dictionary that is being returned (check 'else' clause)
+			temp_batch_x = np.zeros_like(kwargs['batch_vel'])
+			temp_batch_x[:, :, ::2] = batch_x[:, :, 2::4]
+			temp_batch_x[:, :, 1::2] = batch_x[:, :, 3::4]
+
+			batch_x = temp_batch_x
 		else:
 			batch_x = kwargs['batch_vel']
 			batch_y = kwargs['batch_y']
