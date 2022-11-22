@@ -5,9 +5,12 @@ if sys.version_info[0] < 3:
 	sys.path.append('../src/external')
 	from vrnn_cell import VariationalRNNCell as vrnn_cell
 	from tf_utils import *
+	# if you are using python 2, you might need to rework this piece of code to import the Support file.
 else:
 	from src.cells.vrnn_cell import VariationalRNNCell as vrnn_cell
 	from src.models.tf_utils import *
+	from src.data_utils import Support as sup
+
 import numpy as np
 import os
 from colorama import Fore, Style
