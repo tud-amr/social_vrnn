@@ -53,6 +53,9 @@ class NetworkModel():
 		self.regularization_weight = args.regularization_weight
 		self.grid_width = int(args.submap_width / args.submap_resolution)
 		self.grid_height = int(args.submap_height / args.submap_resolution)
+
+		self.div_loss_in_total_loss = args.div_loss_in_total_loss
+
 		# Specify placeholders
 		self.input_state_placeholder = tf.placeholder(dtype=tf.float32,
 		                                              shape=[self.batch_size, self.truncated_backprop_length,
@@ -314,7 +317,7 @@ class NetworkModel():
 
 			# Reduce mean in all dimensions
 			self.div_loss = tf.reduce_mean(div_loss_over_truncated_back_prop)
-			self.total_loss = tf.reduce_mean(loss_list, axis=0)+(tf.reduce_mean(kl_loss_list, axis=0))*self.beta
+			self.total_loss = tf.reduce_mean(loss_list, axis=0)+(tf.reduce_mean(kl_loss_list, axis=0) + (self.div_loss * self.div_loss_in_total_loss))*self.beta
 			self.reconstruction_loss = tf.reduce_mean(loss_list, axis=0)
 			self.kl_loss = tf.reduce_mean(kl_loss_list, axis=0)
 
