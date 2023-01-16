@@ -5,9 +5,12 @@ if sys.version_info[0] < 3:
 	sys.path.append('../src/external')
 	from vrnn_cell import VariationalRNNCell as vrnn_cell
 	from tf_utils import *
+	# if you are using python 2, you might need to rework this piece of code to import the Support file.
 else:
 	from src.cells.vrnn_cell import VariationalRNNCell as vrnn_cell
 	from src.models.tf_utils import *
+	from src.data_utils import Support as sup
+
 import numpy as np
 import os
 from colorama import Fore, Style
@@ -50,6 +53,9 @@ class NetworkModel():
 		self.regularization_weight = args.regularization_weight
 		self.grid_width = int(args.submap_width / args.submap_resolution)
 		self.grid_height = int(args.submap_height / args.submap_resolution)
+
+		self.div_loss_in_total_loss = args.div_loss_in_total_loss
+
 		# Specify placeholders
 		self.input_state_placeholder = tf.placeholder(dtype=tf.float32,
 		                                              shape=[self.batch_size, self.truncated_backprop_length,
@@ -311,7 +317,7 @@ class NetworkModel():
 
 			# Reduce mean in all dimensions
 			self.div_loss = tf.reduce_mean(div_loss_over_truncated_back_prop)
-			self.total_loss = tf.reduce_mean(loss_list, axis=0)+(tf.reduce_mean(kl_loss_list, axis=0))*self.beta
+			self.total_loss = tf.reduce_mean(loss_list, axis=0)+(tf.reduce_mean(kl_loss_list, axis=0) + (self.div_loss * self.div_loss_in_total_loss))*self.beta
 			self.reconstruction_loss = tf.reduce_mean(loss_list, axis=0)
 			self.kl_loss = tf.reduce_mean(kl_loss_list, axis=0)
 
@@ -354,7 +360,13 @@ class NetworkModel():
 	def feed_dic(self, **kwargs):
 		if self.args.rotated_grid:
 			batch_x, batch_y = sup.rotate_batch_to_local_frame(kwargs['batch_y'], kwargs['batch_x'])
-			batch_x = batch_x[:, :, 2:]
+
+			# recreating batch_vel from batch_x (note that batch_x acts as batch_vel in the dictionary that is being returned (check 'else' clause)
+			temp_batch_x = np.zeros_like(kwargs['batch_vel'])
+			temp_batch_x[:, :, ::2] = batch_x[:, :, 2::4]
+			temp_batch_x[:, :, 1::2] = batch_x[:, :, 3::4]
+
+			batch_x = temp_batch_x
 		else:
 			batch_x = kwargs['batch_vel']
 			batch_y = kwargs['batch_y']

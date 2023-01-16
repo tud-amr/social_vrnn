@@ -75,7 +75,7 @@ input_dim = 4  # [vx, vy]
 input_state_dim = 2  # [vx, vy]
 output_dim = 2  # data state dimension
 output_pred_state_dim = 4  # ux uy simgax sigmay
-pedestrian_vector_dim = 36
+pedestrian_vector_dim = 4
 pedestrian_vector_state_dim = 2
 cmd_vector_dim = 2
 pedestrian_radius = 0.3
@@ -93,12 +93,18 @@ multipath = False
 real_world_data = False
 end_to_end = True
 agents_on_grid = False
-rotated_grid = False
+rotated_grid = False		# To anyone working with this flag as true in the future, I would recommend making a full check of the behaviour of the model
 centered_grid = True
 noise = False
 normalize_data = False
 real_world_data = False
 regulate_log_loss = False
+
+# added parameter to allow the user to choose between the original source code implementation of SocialVRNN,
+# in which the diversity term is omitted from the total loss,
+# and the Loss function as specified in the article (ie, *with* the diversity term present in the total loss function
+div_loss_in_total_loss = False
+
 # Map parameters
 submap_resolution = 0.1
 submap_width = 6
@@ -264,6 +270,14 @@ def parse_args():
 	parser.add_argument('--sx_pos', help='sx_pos', type=float, default=1)
 	parser.add_argument('--sy_pos', help='sy_pos', type=float, default=1)
 	parser.add_argument('--train_set', help='Percentage of the dataset used for training', type=float, default=train_set)
+
+	parser.add_argument('--div_loss_in_total_loss',
+						help='using implementation of the article instead of the original source code?\n'
+							 'True: incorporate the diversity loss in the total loss (as specified in the Social-VRNN publication\n'
+							 'False: do not incorporate the diversity term (as specified in the original implementation of Social-VRNN)',
+						type=sup.str2bool,
+						default=div_loss_in_total_loss)
+
 	args = parser.parse_args()
 
 	return args

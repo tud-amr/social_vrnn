@@ -104,11 +104,15 @@ def rotate_batch_to_local_frame(batch_y, batch_x):
     for tbp_step in range(batch_x.shape[1]):
       heading = math.atan2(bx[batch_idx, tbp_step, 3], bx[batch_idx, tbp_step, 2])
       rot_mat = np.array([[np.cos(-heading), -np.sin(-heading)], [np.sin(-heading), np.cos(-heading)]])
-      bx[batch_idx, tbp_step, 2:] = np.dot(rot_mat, bx[batch_idx, tbp_step, 2:])
+      for pred_step in range(int(bx.shape[2] / 2)):
+        bx[batch_idx, tbp_step, 2 * pred_step:2 * pred_step + 2] = np.dot(
+          rot_mat, bx[batch_idx, tbp_step, 2 * pred_step:2 * pred_step + 2]
+        )
       for pred_step in range(int(by.shape[2] / 2)):
-        by[batch_idx, tbp_step, 2 * pred_step:2 * pred_step + 2] = np.dot(rot_mat, by[batch_idx, tbp_step,
-                                                                                   2 * pred_step:2 * pred_step + 2])
-  return bx , by
+        by[batch_idx, tbp_step, 2 * pred_step:2 * pred_step + 2] = np.dot(
+          rot_mat, by[batch_idx, tbp_step, 2 * pred_step:2 * pred_step + 2]
+        )
+  return bx, by
 
 def plot_grid(ax, center, grid, grid_resolution, submap_size):
     """
